@@ -8,15 +8,17 @@ import (
 
 // PageData holds data for rendering a markdown page.
 type PageData struct {
-	Title   string
-	Content template.HTML
-	Path    string
+	Title     string
+	SiteTitle string
+	Content   template.HTML
+	Path      string
 }
 
 // IndexData holds data for rendering the index page.
 type IndexData struct {
-	Title    string
-	TreeHTML template.HTML
+	Title     string
+	SiteTitle string
+	TreeHTML  template.HTML
 }
 
 var pageTmpl = template.Must(template.New("page").Parse(pageTemplate))
@@ -37,7 +39,7 @@ const pageTemplate = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.Title}} - gomdoc</title>
+    <title>{{.Title}} - {{.SiteTitle}}</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -49,6 +51,9 @@ const pageTemplate = `<!DOCTYPE html>
     <main class="content">
         {{.Content}}
     </main>
+    <footer class="site-footer">
+        Documentation created by gomdoc: <a href="https://github.com/lacrioque/gomdoc/">https://github.com/lacrioque/gomdoc/</a>
+    </footer>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({ startOnLoad: true, theme: 'default' });
@@ -70,16 +75,19 @@ const indexTemplate = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Index - gomdoc</title>
+    <title>Index - {{.SiteTitle}}</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <nav class="nav-buttons">
-        <span class="nav-title">gomdoc</span>
+        <span class="nav-title">{{.SiteTitle}}</span>
     </nav>
     <main class="content index-content">
         <h1>File Index</h1>
         {{.TreeHTML}}
     </main>
+    <footer class="site-footer">
+        Documentation created by gomdoc: <a href="https://github.com/lacrioque/gomdoc/">https://github.com/lacrioque/gomdoc/</a>
+    </footer>
 </body>
 </html>`

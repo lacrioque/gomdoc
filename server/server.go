@@ -19,14 +19,20 @@ import (
 type Server struct {
 	baseDir  string
 	port     int
+	title    string
+	authUser string
+	authPass string
 	renderer *renderer.Renderer
 }
 
 // New creates a new Server instance.
-func New(baseDir string, port int) *Server {
+func New(baseDir string, port int, title, authUser, authPass string) *Server {
 	return &Server{
 		baseDir:  baseDir,
 		port:     port,
+		title:    title,
+		authUser: authUser,
+		authPass: authPass,
 		renderer: renderer.New(),
 	}
 }
@@ -42,7 +48,27 @@ func (s *Server) Start() error {
 	log.Printf("Starting gomdoc on http://localhost%s", addr)
 	log.Printf("Serving files from: %s", s.baseDir)
 
-	return http.ListenAndServe(addr, mux)
+	// Wrap with basic auth middleware if credentials are configured
+	var handler http.Handler = mux
+	if s.authUser != "" {
+		log.Printf("Basic authentication enabled")
+		handler = s.basicAuthMiddleware(mux)
+	}
+
+	return http.ListenAndServe(addr, handler)
+}
+
+// basicAuthMiddleware wraps a handler with HTTP Basic Authentication.
+func (s *Server) basicAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != s.authUser || pass != s.authPass {
+			w.Header().Set("WWW-Authenticate", `Basic realm="gomdoc"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // handleRequest routes requests to either the index or a markdown file.
@@ -71,8 +97,9 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	treeHTML := scanner.RenderTree(tree)
 
 	data := templates.IndexData{
-		Title:    "Index",
-		TreeHTML: template.HTML(treeHTML),
+		Title:     "Index",
+		SiteTitle: s.title,
+		TreeHTML:  template.HTML(treeHTML),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -115,9 +142,10 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request) {
 	title := filepath.Base(urlPath)
 
 	data := templates.PageData{
-		Title:   title,
-		Content: template.HTML(html),
-		Path:    r.URL.Path,
+		Title:     title,
+		SiteTitle: s.title,
+		Content:   template.HTML(html),
+		Path:      r.URL.Path,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -332,4 +360,23 @@ body {
 /* Index page */
 .index-content h1 {
     margin-top: 0;
+}
+
+/* Footer */
+.site-footer {
+    margin-top: 40px;
+    padding: 20px 0;
+    border-top: 1px solid #e0e0e0;
+    text-align: center;
+    font-size: 14px;
+    color: #888;
+}
+
+.site-footer a {
+    color: #0066cc;
+    text-decoration: none;
+}
+
+.site-footer a:hover {
+    text-decoration: underline;
 }`

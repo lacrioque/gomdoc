@@ -47,6 +47,12 @@ go install
 
 # Combine options
 ./gomdoc -dir ./docs -port 8080
+
+# Custom site title
+./gomdoc -title "My Project Docs"
+
+# Enable basic authentication
+./gomdoc -auth admin:secret123
 ```
 
 Then open `http://localhost:7331` in your browser.
@@ -57,6 +63,8 @@ Then open `http://localhost:7331` in your browser.
 |------|---------|-------------|
 | `-port` | `7331` | Port to run the server on |
 | `-dir` | `.` | Base directory to serve markdown files from |
+| `-title` | `gomdoc` | Custom title for the documentation site |
+| `-auth` | *(none)* | Basic auth credentials in `user:password` format |
 
 ## Project Structure
 

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gomdoc/server"
 )
@@ -15,7 +16,20 @@ import (
 func main() {
 	port := flag.Int("port", 7331, "Port to run the server on")
 	dir := flag.String("dir", ".", "Base directory to serve markdown files from")
+	title := flag.String("title", "gomdoc", "Custom title for the documentation site")
+	auth := flag.String("auth", "", "Basic auth credentials in user:password format")
 	flag.Parse()
+
+	// Validate auth format if provided
+	var authUser, authPass string
+	if *auth != "" {
+		parts := strings.SplitN(*auth, ":", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			log.Fatalf("Invalid auth format. Use: -auth user:password")
+		}
+		authUser = parts[0]
+		authPass = parts[1]
+	}
 
 	// Resolve and validate the base directory
 	baseDir, err := filepath.Abs(*dir)
@@ -34,7 +48,7 @@ func main() {
 	fmt.Println("gomdoc - Markdown Documentation Server")
 	fmt.Println("=======================================")
 
-	srv := server.New(baseDir, *port)
+	srv := server.New(baseDir, *port, *title, authUser, authPass)
 	if err := srv.Start(); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
