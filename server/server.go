@@ -125,6 +125,9 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Parse frontmatter before rendering
+	frontmatter, content := renderer.ParseFrontmatter(content)
+
 	// Get the directory of the current file for link resolution
 	currentDir := filepath.Dir(urlPath)
 	if currentDir == "." {
@@ -138,12 +141,16 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract title from the file name
-	title := filepath.Base(urlPath)
+	// Use frontmatter title if available, otherwise use filename
+	title := frontmatter.Title
+	if title == "" {
+		title = filepath.Base(urlPath)
+	}
 
 	data := templates.PageData{
 		Title:     title,
 		SiteTitle: s.title,
+		Author:    frontmatter.Author,
 		Content:   template.HTML(html),
 		Path:      r.URL.Path,
 	}
@@ -379,4 +386,77 @@ body {
 
 .site-footer a:hover {
     text-decoration: underline;
+}
+
+/* Print header (hidden on screen) */
+.print-header {
+    display: none;
+}
+
+/* Print styles */
+@media print {
+    .nav-buttons {
+        display: none !important;
+    }
+
+    .site-footer {
+        display: none !important;
+    }
+
+    .print-header {
+        display: block !important;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #333;
+    }
+
+    .print-title {
+        margin: 0;
+        font-size: 24pt;
+    }
+
+    .print-author {
+        margin: 5px 0 0 0;
+        font-size: 12pt;
+        color: #555;
+    }
+
+    body {
+        background: white;
+        max-width: 100%;
+        margin: 0;
+        padding: 20px;
+    }
+
+    .content {
+        box-shadow: none;
+        padding: 0;
+        background: white;
+    }
+
+    .content pre {
+        background-color: #f5f5f5 !important;
+        color: #333 !important;
+        border: 1px solid #ddd;
+    }
+
+    a {
+        color: #000 !important;
+        text-decoration: underline;
+    }
+
+    /* Prevent page breaks inside elements */
+    .content h1, .content h2, .content h3,
+    .content h4, .content h5, .content h6 {
+        page-break-after: avoid;
+    }
+
+    .content pre, .content blockquote, .content table {
+        page-break-inside: avoid;
+    }
+
+    .content p {
+        orphans: 3;
+        widows: 3;
+    }
 }`

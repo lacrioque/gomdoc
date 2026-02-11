@@ -14,6 +14,87 @@ import (
 	"github.com/yuin/goldmark/renderer/html"
 )
 
+// Frontmatter holds metadata parsed from YAML frontmatter.
+type Frontmatter struct {
+	Title  string
+	Author string
+}
+
+// ParseFrontmatter extracts YAML frontmatter from markdown content.
+// Returns the parsed frontmatter and the remaining content without frontmatter.
+func ParseFrontmatter(content []byte) (Frontmatter, []byte) {
+	fm := Frontmatter{}
+	text := string(content)
+
+	// Check for frontmatter delimiter at the start
+	if !strings.HasPrefix(text, "---\n") && !strings.HasPrefix(text, "---\r\n") {
+		return fm, content
+	}
+
+	// Find the closing delimiter
+	var endIndex int
+	if strings.HasPrefix(text, "---\r\n") {
+		endIndex = strings.Index(text[5:], "\n---")
+		if endIndex != -1 {
+			endIndex += 5
+		}
+	} else {
+		endIndex = strings.Index(text[4:], "\n---")
+		if endIndex != -1 {
+			endIndex += 4
+		}
+	}
+
+	if endIndex == -1 {
+		return fm, content
+	}
+
+	// Extract frontmatter block
+	var fmBlock string
+	if strings.HasPrefix(text, "---\r\n") {
+		fmBlock = text[5:endIndex]
+	} else {
+		fmBlock = text[4:endIndex]
+	}
+
+	// Parse key-value pairs
+	lines := strings.Split(fmBlock, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		// Remove surrounding quotes if present
+		value = strings.Trim(value, "\"'")
+
+		switch strings.ToLower(key) {
+		case "title":
+			fm.Title = value
+		case "author":
+			fm.Author = value
+		}
+	}
+
+	// Find the end of the closing delimiter line
+	remaining := text[endIndex+4:] // Skip "\n---"
+	if strings.HasPrefix(remaining, "\r\n") {
+		remaining = remaining[2:]
+	} else if strings.HasPrefix(remaining, "\n") {
+		remaining = remaining[1:]
+	}
+
+	return fm, []byte(remaining)
+}
+
 // Renderer handles markdown to HTML conversion.
 type Renderer struct {
 	md goldmark.Markdown

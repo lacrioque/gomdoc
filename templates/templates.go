@@ -10,6 +10,7 @@ import (
 type PageData struct {
 	Title     string
 	SiteTitle string
+	Author    string
 	Content   template.HTML
 	Path      string
 }
@@ -43,10 +44,15 @@ const pageTemplate = `<!DOCTYPE html>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <header class="print-header">
+        <h1 class="print-title">{{.Title}}</h1>
+        {{if .Author}}<p class="print-author">{{.Author}}</p>{{end}}
+    </header>
     <nav class="nav-buttons">
         <button onclick="history.back()" class="nav-btn">Back</button>
         <a href="/"><button class="nav-btn">Home</button></a>
         <span class="current-path">{{.Path}}</span>
+        <button onclick="window.print()" class="nav-btn print-btn">Print</button>
     </nav>
     <main class="content">
         {{.Content}}
