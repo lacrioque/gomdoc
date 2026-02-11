@@ -395,6 +395,19 @@ body {
 
 /* Print styles */
 @media print {
+
+    html, body {
+        background: white;
+        max-width: 100%;
+        margin: 0;
+        }
+        
+    @page {
+        size: A4;
+        margin: 0;
+        padding: 12mm 16mm 24mm 12mm;
+    }
+        
     .nav-buttons {
         display: none !important;
     }
@@ -421,13 +434,6 @@ body {
         color: #555;
     }
 
-    body {
-        background: white;
-        max-width: 100%;
-        margin: 0;
-        padding: 20px;
-    }
-
     .content {
         box-shadow: none;
         padding: 0;
@@ -444,8 +450,13 @@ body {
         color: #000 !important;
         text-decoration: underline;
     }
+    
+    /* Prevent page breaks inside elements and break before h1*/
 
-    /* Prevent page breaks inside elements */
+    .content h1:not(:first-of-type) {
+        page-break-before: always;
+    }
+    
     .content h1, .content h2, .content h3,
     .content h4, .content h5, .content h6 {
         page-break-after: avoid;
