@@ -12,17 +12,32 @@ A lightweight Go-based markdown documentation server that renders `.md` files as
 - Mermaid diagram support (client-side rendering)
 - Syntax highlighting for code blocks
 - GitHub Flavored Markdown (tables, strikethrough, autolinks)
+- Full-text search with in-memory index
+- MCP server for AI agent access (`-mcp` flag)
 
 ## Installation
+
+### Quick Install
+
+```bash
+# Install latest version
+curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh
+
+# Install a specific version
+curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh -s -- v2.0.0
+```
+
+You can set a custom install directory with the `INSTALL_DIR` environment variable:
+
+```bash
+INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh
+```
 
 ### From Source
 
 ```bash
-# Clone the repository
-git clone <repository-url>
+git clone https://github.com/lacrioque/gomdoc.git
 cd gomdoc
-
-# Build
 go build -o gomdoc
 
 # Optional: Install to PATH
@@ -31,7 +46,8 @@ go install
 
 ### Requirements
 
-- Go 1.21 or later
+- Quick install: `curl`, macOS (Apple Silicon) / Linux (amd64) / Windows (amd64 via MSYS/Cygwin)
+- From source: Go 1.21 or later
 
 ## Usage
 
@@ -65,6 +81,30 @@ Then open `http://localhost:7331` in your browser.
 | `-dir` | `.` | Base directory to serve markdown files from |
 | `-title` | `gomdoc` | Custom title for the documentation site |
 | `-auth` | *(none)* | Basic auth credentials in `user:password` format |
+| `-mcp` | `false` | Run as MCP server over stdio instead of HTTP |
+
+## MCP Server
+
+Run gomdoc as an MCP server to give AI coding agents structured access to your documentation:
+
+```bash
+gomdoc -mcp -dir /path/to/docs
+```
+
+Add to your Claude Code settings (`.claude/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "docs": {
+      "command": "gomdoc",
+      "args": ["-mcp", "-dir", "/path/to/docs"]
+    }
+  }
+}
+```
+
+The MCP server exposes six tools: `browse_topics`, `search_documents`, `get_outline`, `read_section`, `list_documents`, and `read_document`. See [docs/mcp-usage.md](docs/mcp-usage.md) for the full guide.
 
 ## Project Structure
 
@@ -72,12 +112,17 @@ Then open `http://localhost:7331` in your browser.
 gomdoc/
 ├── main.go              # Entry point and CLI handling
 ├── go.mod               # Go module definition
+├── install.sh           # Quick install script
 ├── server/
 │   └── server.go        # HTTP server, routing, and embedded CSS
 ├── scanner/
 │   └── scanner.go       # File discovery and tree building
 ├── renderer/
 │   └── renderer.go      # Markdown to HTML conversion
+├── search/
+│   └── search.go        # In-memory search index and keyword ranking
+├── mcpserver/
+│   └── mcpserver.go     # MCP server for AI agent access
 └── templates/
     └── templates.go     # HTML page templates
 ```
