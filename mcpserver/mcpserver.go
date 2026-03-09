@@ -54,29 +54,29 @@ func (s *Server) Run(ctx context.Context) error {
 
 // listArgs are the input parameters for the list_documents tool.
 type listArgs struct {
-	Path string `json:"path,omitempty" jsonschema:"description=Optional subdirectory path to list. Leave empty for root."`
+	Path string `json:"path,omitempty" jsonschema:"optional subdirectory path to list, leave empty for root"`
 }
 
 // readArgs are the input parameters for the read_document tool.
 type readArgs struct {
-	Path string `json:"path" jsonschema:"required,description=Document path as shown by list_documents (e.g. 'guide' or 'sub/nested')."`
+	Path string `json:"path" jsonschema:"document path as shown by list_documents, e.g. guide or sub/nested"`
 }
 
 // searchArgs are the input parameters for the search_documents tool.
 type searchArgs struct {
-	Query      string `json:"query" jsonschema:"required,description=Text to search for across all documents. Supports multi-word keyword queries ranked by relevance."`
-	MaxResults int    `json:"max_results,omitempty" jsonschema:"description=Maximum number of results to return. Default 10."`
+	Query      string `json:"query" jsonschema:"text to search for across all documents, supports multi-word keyword queries"`
+	MaxResults int    `json:"max_results,omitempty" jsonschema:"maximum number of results to return, default 10"`
 }
 
 // outlineArgs are the input parameters for the get_outline tool.
 type outlineArgs struct {
-	Path string `json:"path" jsonschema:"required,description=Document path to get the outline for (e.g. 'guide' or 'sub/nested')."`
+	Path string `json:"path" jsonschema:"document path to get the outline for, e.g. guide or sub/nested"`
 }
 
 // sectionArgs are the input parameters for the read_section tool.
 type sectionArgs struct {
-	Path    string `json:"path" jsonschema:"required,description=Document path containing the section."`
-	Heading string `json:"heading" jsonschema:"required,description=Heading text to find (case-insensitive partial match). Returns the content under that heading."`
+	Path    string `json:"path" jsonschema:"document path containing the section"`
+	Heading string `json:"heading" jsonschema:"heading text to find, case-insensitive partial match"`
 }
 
 // registerTools sets up all MCP tools on the server.
