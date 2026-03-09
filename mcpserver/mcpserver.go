@@ -6,7 +6,10 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,22 +35,44 @@ func New(baseDir string) *Server {
 		index:   search.NewIndex(),
 	}
 
+	// Silence SDK internal logs (EOF, trailing data) that go to stderr
+	// and confuse users doing quick pipe tests.
 	s.mcp = mcp.NewServer(&mcp.Implementation{
 		Name:    "gomdoc",
-		Version: "2.0.0",
-	}, nil)
+		Version: "2.1.0",
+	}, &mcp.ServerOptions{
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
 
 	s.registerTools()
 	return s
 }
 
 // Run builds the search index and starts the MCP server on stdio.
+// A clean EOF (stdin closed) is treated as a graceful shutdown.
 func (s *Server) Run(ctx context.Context) error {
 	if err := s.index.Build(s.baseDir); err != nil {
 		return fmt.Errorf("building search index: %w", err)
 	}
 
-	return s.mcp.Run(ctx, &mcp.StdioTransport{})
+	err := s.mcp.Run(ctx, &mcp.StdioTransport{})
+	if isEOF(err) {
+		return nil
+	}
+	return err
+}
+
+// isEOF checks whether an error is or wraps io.EOF.
+// The SDK wraps EOF in "server is closing: EOF", so we check both
+// errors.Is and the error string as a fallback.
+func isEOF(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+	return strings.Contains(err.Error(), "EOF")
 }
 
 // --- Argument types ---
