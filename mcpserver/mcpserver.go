@@ -82,6 +82,11 @@ type sectionArgs struct {
 // registerTools sets up all MCP tools on the server.
 func (s *Server) registerTools() {
 	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "help",
+		Description: "Returns a complete guide on how to use the gomdoc MCP server. Includes tool descriptions, recommended workflow, and a ready-to-paste CLAUDE.md / AGENTS.md snippet for configuring AI agents to use this documentation server. Call this first if you are unfamiliar with gomdoc.",
+	}, s.handleHelp)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "list_documents",
 		Description: "List all available markdown documents. Returns document titles and paths that can be used with other tools.",
 	}, s.handleListDocuments)
@@ -110,6 +115,94 @@ func (s *Server) registerTools() {
 		Name:        "read_section",
 		Description: "Read a specific section of a document by heading text. Returns only the content under the matched heading, up to the next heading of equal or higher level. Use this for targeted reading instead of loading entire documents.",
 	}, s.handleReadSection)
+}
+
+// handleHelp returns a usage guide for AI agents, including a ready-to-paste
+// configuration snippet for CLAUDE.md or AGENTS.md.
+func (s *Server) handleHelp(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+	docCount := len(s.index.AllTopics())
+
+	help := fmt.Sprintf(`# gomdoc MCP Server — AI Agent Guide
+
+This MCP server gives you structured access to %d markdown documents.
+Instead of reading raw files, use keyword search, headline browsing,
+and section-level access to find information efficiently.
+
+## Available Tools
+
+| Tool               | Purpose                                              |
+|--------------------|------------------------------------------------------|
+| help               | This guide — call it to learn how to use gomdoc      |
+| browse_topics      | See all headings across all docs (start here)        |
+| search_documents   | Keyword search with relevance ranking                |
+| get_outline        | Table of contents for a single document              |
+| read_section       | Read content under a specific heading                |
+| list_documents     | List all document paths                              |
+| read_document      | Read an entire document (use sparingly)              |
+
+## Recommended Workflow
+
+1. browse_topics     — discover what documentation exists
+2. search_documents  — find docs by keyword (e.g. "authentication setup")
+3. get_outline       — see the structure of a relevant document
+4. read_section      — read just the section you need
+5. read_document     — only if you need the full file
+
+This approach minimizes token usage. Prefer read_section over read_document.
+
+## Keyword Search Tips
+
+- Multi-word queries match each word independently
+- Results are ranked by: keyword frequency, title matches (+3), heading matches (+2)
+- Use specific terms: "websocket authentication" not "how do I authenticate websockets"
+
+## CLAUDE.md / AGENTS.md Snippet
+
+Copy the following into your project's CLAUDE.md or AGENTS.md to instruct
+AI agents how to use this documentation server:
+
+---
+
+### Documentation Access
+
+This project has a gomdoc MCP server connected as "docs" that provides
+structured access to project documentation. Use it as follows:
+
+**Finding information:**
+- Call browse_topics to see all available documentation headings
+- Call search_documents with keywords to find relevant documents
+- Call get_outline to see a document's table of contents
+- Call read_section to read a specific section by heading text
+
+**Rules:**
+- Always search or browse before reading full documents
+- Prefer read_section over read_document to save context
+- Use keyword queries, not natural language sentences
+- Check documentation before making assumptions about project conventions
+
+---
+
+## MCP Server Configuration
+
+To add this server to a project, include in .claude/settings.json:
+
+{
+  "mcpServers": {
+    "docs": {
+      "command": "gomdoc",
+      "args": ["-mcp", "-dir", "/path/to/docs"]
+    }
+  }
+}
+
+Or for Cursor / other MCP clients, use the stdio transport:
+
+  gomdoc -mcp -dir /path/to/docs
+
+The server indexes all .md files at startup and serves them over JSON-RPC.
+`, docCount)
+
+	return textResult(help), nil, nil
 }
 
 // handleListDocuments returns a list of all available documents.

@@ -235,6 +235,30 @@ func TestHandleReadSectionNotFound(t *testing.T) {
 	}
 }
 
+func TestHandleHelp(t *testing.T) {
+	s := newTestServer(t)
+	ctx := context.Background()
+
+	result, _, err := s.handleHelp(ctx, nil, struct{}{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, "AI Agent Guide") {
+		t.Errorf("expected guide header, got: %s", text[:100])
+	}
+	if !strings.Contains(text, "browse_topics") {
+		t.Errorf("expected tool reference in help text")
+	}
+	if !strings.Contains(text, "CLAUDE.md") {
+		t.Errorf("expected CLAUDE.md snippet in help text")
+	}
+	if !strings.Contains(text, "mcpServers") {
+		t.Errorf("expected MCP config example in help text")
+	}
+}
+
 func TestHandleReadSectionMissingArgs(t *testing.T) {
 	s := newTestServer(t)
 	ctx := context.Background()
