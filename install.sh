@@ -124,7 +124,7 @@ download_and_install() {
 
 install_skill() {
     SKILL_DIR="$HOME/.claude/skills/gomdoc-setup"
-    SKILL_URL="https://raw.githubusercontent.com/$REPO/$VERSION/.claude/skills/gomdoc-setup/SKILL.md"
+    SKILL_URL="https://raw.githubusercontent.com/$REPO/main/.claude/skills/gomdoc-setup/SKILL.md"
 
     echo ""
     echo "Claude Code skill available: /gomdoc-setup"
