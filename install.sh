@@ -120,6 +120,46 @@ download_and_install() {
 
     echo ""
     echo "gomdoc $VERSION installed to $INSTALL_DIR/gomdoc"
+}
+
+install_skill() {
+    SKILL_DIR="$HOME/.claude/skills/gomdoc-setup"
+    SKILL_URL="https://raw.githubusercontent.com/$REPO/$VERSION/.claude/skills/gomdoc-setup/SKILL.md"
+
+    echo ""
+    echo "Claude Code skill available: /gomdoc-setup"
+    echo "  Configures gomdoc MCP for any project with a single command."
+
+    # Check if we can prompt interactively
+    if [ ! -t 0 ]; then
+        echo ""
+        echo "To install the skill globally, run:"
+        echo "  mkdir -p $SKILL_DIR && curl -fsSL $SKILL_URL -o $SKILL_DIR/SKILL.md"
+        return
+    fi
+
+    printf "\nInstall the Claude Code skill globally? [y/N] "
+    read -r REPLY < /dev/tty
+
+    case "$REPLY" in
+        [yY]|[yY][eE][sS])
+            mkdir -p "$SKILL_DIR"
+            if curl -fsSL -o "$SKILL_DIR/SKILL.md" "$SKILL_URL"; then
+                echo "Skill installed to $SKILL_DIR"
+                echo "Use /gomdoc-setup in any project to configure the MCP server."
+            else
+                echo "Warning: could not download skill file."
+                echo "You can install it manually from: $SKILL_URL"
+            fi
+            ;;
+        *)
+            echo "Skipped. You can install later with:"
+            echo "  mkdir -p $SKILL_DIR && curl -fsSL $SKILL_URL -o $SKILL_DIR/SKILL.md"
+            ;;
+    esac
+}
+
+print_summary() {
     echo ""
     echo "Get started:"
     echo "  gomdoc -dir /path/to/docs        # HTTP server"
@@ -141,3 +181,5 @@ esac
 detect_platform
 resolve_version
 download_and_install
+install_skill
+print_summary

@@ -33,6 +33,8 @@ curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | 
 INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh
 ```
 
+The installer will also offer to install the `/gomdoc-setup` Claude Code skill globally, which lets you run `/gomdoc-setup docs/` in any project to configure the MCP server.
+
 ### From Source
 
 ```bash
