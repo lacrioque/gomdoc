@@ -29,7 +29,8 @@ type Server struct {
 }
 
 // New creates a new MCP server for the given documentation directory.
-func New(baseDir string) *Server {
+// The version parameter is displayed in MCP server info responses.
+func New(baseDir, version string) *Server {
 	s := &Server{
 		baseDir: baseDir,
 		index:   search.NewIndex(),
@@ -39,7 +40,7 @@ func New(baseDir string) *Server {
 	// and confuse users doing quick pipe tests.
 	s.mcp = mcp.NewServer(&mcp.Implementation{
 		Name:    "gomdoc",
-		Version: "2.1.0",
+		Version: version,
 	}, &mcp.ServerOptions{
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})

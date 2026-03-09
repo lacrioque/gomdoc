@@ -15,13 +15,22 @@ import (
 	"gomdoc/server"
 )
 
+// version is set at build time via -ldflags.
+var version = "dev"
+
 func main() {
 	port := flag.Int("port", 7331, "Port to run the server on")
 	dir := flag.String("dir", ".", "Base directory to serve markdown files from")
 	title := flag.String("title", "gomdoc", "Custom title for the documentation site")
 	auth := flag.String("auth", "", "Basic auth credentials in user:password format")
 	mcpMode := flag.Bool("mcp", false, "Run as MCP server over stdio instead of HTTP")
+	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 
 	// Validate auth format if provided
 	var authUser, authPass string
@@ -50,7 +59,7 @@ func main() {
 
 	// Run as MCP server if requested
 	if *mcpMode {
-		mcp := mcpserver.New(baseDir)
+		mcp := mcpserver.New(baseDir, version)
 		if err := mcp.Run(context.Background()); err != nil {
 			log.Fatalf("MCP server error: %v", err)
 		}

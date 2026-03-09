@@ -71,6 +71,9 @@ go install
 
 # Enable basic authentication
 ./gomdoc -auth admin:secret123
+
+# Check version
+./gomdoc -version
 ```
 
 Then open `http://localhost:7331` in your browser.
@@ -84,6 +87,7 @@ Then open `http://localhost:7331` in your browser.
 | `-title` | `gomdoc` | Custom title for the documentation site |
 | `-auth` | *(none)* | Basic auth credentials in `user:password` format |
 | `-mcp` | `false` | Run as MCP server over stdio instead of HTTP |
+| `-version` | | Print version and exit |
 
 ## MCP Server
 
