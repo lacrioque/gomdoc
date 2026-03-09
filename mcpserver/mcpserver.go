@@ -6,10 +6,10 @@ package mcpserver
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,31 +49,17 @@ func New(baseDir, version string) *Server {
 	return s
 }
 
-// Run builds the search index and starts the MCP server on stdio.
-// A clean EOF (stdin closed) is treated as a graceful shutdown.
-func (s *Server) Run(ctx context.Context) error {
-	if err := s.index.Build(s.baseDir); err != nil {
-		return fmt.Errorf("building search index: %w", err)
-	}
-
-	err := s.mcp.Run(ctx, &mcp.StdioTransport{})
-	if isEOF(err) {
-		return nil
-	}
-	return err
+// BuildIndex builds the search index from the documentation directory.
+func (s *Server) BuildIndex() error {
+	return s.index.Build(s.baseDir)
 }
 
-// isEOF checks whether an error is or wraps io.EOF.
-// The SDK wraps EOF in "server is closing: EOF", so we check both
-// errors.Is and the error string as a fallback.
-func isEOF(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errors.Is(err, io.EOF) {
-		return true
-	}
-	return strings.Contains(err.Error(), "EOF")
+// SSEHandler returns an http.Handler that serves the MCP protocol over SSE.
+// Mount this on your HTTP server to expose MCP alongside the web UI.
+func (s *Server) SSEHandler() http.Handler {
+	return mcp.NewSSEHandler(func(_ *http.Request) *mcp.Server {
+		return s.mcp
+	}, nil)
 }
 
 // --- Argument types ---
@@ -210,22 +196,22 @@ structured access to project documentation. Use it as follows:
 
 ## MCP Server Configuration
 
-To add this server to a project, include in .claude/settings.json:
+Start gomdoc normally — the MCP server runs on /mcp/ alongside the web UI:
+
+  gomdoc -dir /path/to/docs -port 7331
+
+Add to .claude/settings.json:
 
 {
   "mcpServers": {
     "docs": {
-      "command": "gomdoc",
-      "args": ["-mcp", "-dir", "/path/to/docs"]
+      "type": "sse",
+      "url": "http://localhost:7331/mcp/"
     }
   }
 }
 
-Or for Cursor / other MCP clients, use the stdio transport:
-
-  gomdoc -mcp -dir /path/to/docs
-
-The server indexes all .md files at startup and serves them over JSON-RPC.
+The server indexes all .md files at startup and serves MCP over SSE.
 `, docCount)
 
 	return textResult(help), nil, nil

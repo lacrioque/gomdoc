@@ -31,18 +31,24 @@ If not found, offer to install it:
 curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh
 ```
 
+Verify with:
+
+```
+gomdoc -version
+```
+
 ### 2. Configure MCP server
 
-Create or update `.claude/settings.json` to add the gomdoc MCP server.
-Use the resolved documentation directory as the `-dir` argument with an
-absolute path.
+gomdoc serves MCP on `/mcp/` alongside the HTTP server via SSE transport.
+
+Create or update `.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "docs": {
-      "command": "gomdoc",
-      "args": ["-mcp", "-dir", "<absolute-path-to-docs>"]
+      "type": "sse",
+      "url": "http://localhost:7331/mcp/"
     }
   }
 }
@@ -50,6 +56,12 @@ absolute path.
 
 If `.claude/settings.json` already exists, merge the `mcpServers` entry
 without overwriting other settings.
+
+Tell the user they need to start gomdoc before using the MCP tools:
+
+```
+gomdoc -dir <absolute-path-to-docs>
+```
 
 ### 3. Add agent instructions
 
@@ -64,11 +76,11 @@ This project has a gomdoc MCP server connected as "docs" that provides
 structured access to project documentation. Use it as follows:
 
 **Finding information:**
+- Call `help` for the full usage guide
 - Call `browse_topics` to see all available documentation headings
 - Call `search_documents` with keywords to find relevant documents
 - Call `get_outline` to see a document's table of contents
 - Call `read_section` to read a specific section by heading text
-- Call `help` for the full usage guide
 
 **Rules:**
 - Always search or browse before reading full documents
@@ -79,19 +91,19 @@ structured access to project documentation. Use it as follows:
 
 ### 4. Verify
 
-Run a quick test to confirm the MCP server starts and can index the docs:
+Check that gomdoc is working:
 
 ```
-echo '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"capabilities":{}}}' | gomdoc -mcp -dir <docs-directory>
+gomdoc -version
 ```
 
-A clean exit (no errors) means it works. Report the number of markdown
-files found in the directory.
+Report the number of markdown files found in the directory.
 
 ### 5. Summary
 
 Tell the user:
 - Where the MCP server was configured
 - How many documents are available
+- Remind them to start gomdoc before using MCP tools
 - That they can use `/gomdoc-setup` again if the docs directory changes
 - They should restart Claude Code for the MCP server to connect

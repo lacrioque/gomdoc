@@ -9,13 +9,13 @@ gomdoc includes an MCP (Model Context Protocol) server that gives AI coding agen
 
 ## Setup
 
-Start the MCP server with the `-mcp` flag:
+The MCP server runs automatically alongside the HTTP server on `/mcp/`. Just start gomdoc normally:
 
 ```
-gomdoc -mcp -dir /path/to/docs
+gomdoc -dir /path/to/docs -port 8080
 ```
 
-This runs a JSON-RPC server over stdio. No HTTP server is started in this mode.
+The MCP endpoint is available at `http://localhost:8080/mcp/` using SSE transport.
 
 ### Claude Code
 
@@ -25,8 +25,8 @@ Add to your project's `.claude/settings.json`:
 {
   "mcpServers": {
     "docs": {
-      "command": "gomdoc",
-      "args": ["-mcp", "-dir", "/path/to/docs"]
+      "type": "sse",
+      "url": "http://localhost:8080/mcp/"
     }
   }
 }
@@ -34,9 +34,15 @@ Add to your project's `.claude/settings.json`:
 
 ### Other MCP Clients
 
-Any MCP-compatible client can connect using the stdio transport. The server name is `gomdoc` and it exposes six tools.
+Any MCP client that supports SSE transport can connect to `http://localhost:<port>/mcp/`.
 
 ## Available Tools
+
+### help
+
+Returns a complete usage guide for AI agents, including a ready-to-paste CLAUDE.md / AGENTS.md snippet. Call this first if you are unfamiliar with gomdoc.
+
+Takes no arguments.
 
 ### browse_topics
 

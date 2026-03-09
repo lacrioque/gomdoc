@@ -12,42 +12,58 @@ gomdoc is a lightweight Go-based markdown documentation server that renders `.md
 # Build
 go build -o gomdoc
 
+# Build with version (used in release workflow)
+go build -ldflags="-s -w -X main.version=v2.3.0" -o gomdoc
+
 # Run locally
-./gomdoc                          # Serve current dir on port 7331
+./gomdoc                          # Serve current dir on port 7331 (MCP on /mcp/)
 ./gomdoc -dir /path/to/docs       # Custom directory
 ./gomdoc -port 8080               # Custom port
 ./gomdoc -title "My Docs"         # Custom site title
 ./gomdoc -auth user:password      # Enable basic authentication
+./gomdoc -version                 # Print version
 
 # Install to PATH
 go install
 
+# Run tests
+go test ./...
+
 # Release builds (cross-platform)
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o gomdoc-macos-silicon
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o gomdoc-linux-amd64
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o gomdoc-windows-amd64.exe
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=vX.Y.Z" -o gomdoc-macos-silicon
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=vX.Y.Z" -o gomdoc-linux-amd64
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=vX.Y.Z" -o gomdoc-windows-amd64.exe
 ```
 
 ## Architecture
 
 ```
-main.go                    # CLI entry point, flag parsing
-server/server.go           # HTTP server, routing, embedded CSS
+main.go                    # CLI entry point, flag parsing, version
+server/server.go           # HTTP server, routing, embedded CSS, mounts MCP SSE handler
 scanner/scanner.go         # File discovery, tree building
 renderer/renderer.go       # Markdown → HTML conversion with link rewriting
+search/search.go           # In-memory index: keyword search, headings, sections
+mcpserver/mcpserver.go     # MCP server: tools, SSE handler
 templates/templates.go     # HTML page templates (embedded strings)
 ```
 
 **Data Flow:**
 1. `scanner.ScanDirectory()` recursively finds `.md` files (skips hidden dirs)
 2. `scanner.BuildTree()` creates nested `TreeNode` structure for navigation
-3. HTTP request to `/path/to/file` resolves to `./path/to/file.md`
-4. `renderer.RenderWithLinks()` converts markdown and rewrites internal `.md` links to routes
-5. `templates.RenderPage()` wraps content in HTML with navigation buttons
+3. `search.Index.Build()` indexes all documents (keywords, headings) at startup
+4. HTTP request to `/path/to/file` resolves to `./path/to/file.md`
+5. `renderer.RenderWithLinks()` converts markdown and rewrites internal `.md` links to routes
+6. `templates.RenderPage()` wraps content in HTML with navigation buttons
+7. MCP requests to `/mcp/` are handled via SSE transport
+
+**MCP Server:**
+- Integrated into HTTP server on `/mcp/` via SSE transport (always running)
+- 7 tools: `help`, `browse_topics`, `search_documents`, `get_outline`, `read_section`, `list_documents`, `read_document`
 
 **Key Dependencies:**
 - goldmark: Markdown parser with GFM extensions
 - goldmark-highlighting: Syntax highlighting via chroma (Monokai theme)
+- go-sdk/mcp: Official MCP Go SDK for AI agent protocol
 - Mermaid.js: Client-side diagram rendering (loaded from CDN)
 
 ## Global Coding Guidelines

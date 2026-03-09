@@ -162,8 +162,7 @@ install_skill() {
 print_summary() {
     echo ""
     echo "Get started:"
-    echo "  gomdoc -dir /path/to/docs        # HTTP server"
-    echo "  gomdoc -mcp -dir /path/to/docs   # MCP server for AI agents"
+    echo "  gomdoc -dir /path/to/docs        # HTTP server + MCP on /mcp/"
 }
 
 # Handle flags

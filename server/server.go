@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gomdoc/mcpserver"
 	"gomdoc/renderer"
 	"gomdoc/scanner"
 	"gomdoc/search"
@@ -24,18 +25,20 @@ type Server struct {
 	title    string
 	authUser string
 	authPass string
+	version  string
 	renderer *renderer.Renderer
 	index    *search.Index
 }
 
 // New creates a new Server instance.
-func New(baseDir string, port int, title, authUser, authPass string) *Server {
+func New(baseDir string, port int, title, authUser, authPass, version string) *Server {
 	return &Server{
 		baseDir:  baseDir,
 		port:     port,
 		title:    title,
 		authUser: authUser,
 		authPass: authPass,
+		version:  version,
 		renderer: renderer.New(),
 		index:    search.NewIndex(),
 	}
@@ -50,14 +53,22 @@ func (s *Server) Start() error {
 		log.Printf("Search index built successfully")
 	}
 
+	// Set up MCP server on the same port
+	mcpSrv := mcpserver.New(s.baseDir, s.version)
+	if err := mcpSrv.BuildIndex(); err != nil {
+		log.Printf("Warning: failed to build MCP index: %v", err)
+	}
+
 	mux := http.NewServeMux()
 
+	mux.Handle("/mcp/", mcpSrv.SSEHandler())
 	mux.HandleFunc("/", s.handleRequest)
 	mux.HandleFunc("/api/search", s.handleSearch)
 	mux.HandleFunc("/static/", s.handleStatic)
 
 	addr := fmt.Sprintf(":%d", s.port)
 	log.Printf("Starting gomdoc on http://localhost%s", addr)
+	log.Printf("MCP server available at http://localhost%s/mcp/", addr)
 	log.Printf("Serving files from: %s", s.baseDir)
 
 	// Wrap with basic auth middleware if credentials are configured

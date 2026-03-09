@@ -13,7 +13,7 @@ A lightweight Go-based markdown documentation server that renders `.md` files as
 - Syntax highlighting for code blocks
 - GitHub Flavored Markdown (tables, strikethrough, autolinks)
 - Full-text search with in-memory index
-- MCP server for AI agent access (`-mcp` flag)
+- MCP server for AI agent access (SSE on `/mcp/`)
 
 ## Installation
 
@@ -86,15 +86,17 @@ Then open `http://localhost:7331` in your browser.
 | `-dir` | `.` | Base directory to serve markdown files from |
 | `-title` | `gomdoc` | Custom title for the documentation site |
 | `-auth` | *(none)* | Basic auth credentials in `user:password` format |
-| `-mcp` | `false` | Run as MCP server over stdio instead of HTTP |
 | `-version` | | Print version and exit |
 
 ## MCP Server
 
-Run gomdoc as an MCP server to give AI coding agents structured access to your documentation:
+The MCP server gives AI coding agents structured access to your documentation via keyword search, headline browsing, and section-level reading.
+
+The MCP server runs automatically on `/mcp/` whenever the HTTP server is running. No extra flags needed.
 
 ```bash
-gomdoc -mcp -dir /path/to/docs
+gomdoc -dir /path/to/docs -port 8080
+# MCP available at http://localhost:8080/mcp/
 ```
 
 Add to your Claude Code settings (`.claude/settings.json`):
@@ -103,14 +105,18 @@ Add to your Claude Code settings (`.claude/settings.json`):
 {
   "mcpServers": {
     "docs": {
-      "command": "gomdoc",
-      "args": ["-mcp", "-dir", "/path/to/docs"]
+      "type": "sse",
+      "url": "http://localhost:8080/mcp/"
     }
   }
 }
 ```
 
-The MCP server exposes six tools: `browse_topics`, `search_documents`, `get_outline`, `read_section`, `list_documents`, and `read_document`. See [docs/mcp-usage.md](docs/mcp-usage.md) for the full guide.
+Any MCP client that supports SSE transport can connect to `http://localhost:<port>/mcp/`.
+
+### Available tools
+
+`help`, `browse_topics`, `search_documents`, `get_outline`, `read_section`, `list_documents`, and `read_document`. See [docs/mcp-usage.md](docs/mcp-usage.md) for the full guide.
 
 ## Project Structure
 
