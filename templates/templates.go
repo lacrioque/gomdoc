@@ -35,6 +35,60 @@ func RenderIndex(w io.Writer, data IndexData) error {
 	return indexTmpl.Execute(w, data)
 }
 
+const searchJS = `
+(function() {
+    var input = document.getElementById('search-input');
+    var resultsDiv = document.getElementById('search-results');
+    var debounceTimer;
+
+    input.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        var query = input.value.trim();
+        if (query.length < 2) {
+            resultsDiv.innerHTML = '';
+            resultsDiv.style.display = 'none';
+            return;
+        }
+        debounceTimer = setTimeout(function() {
+            fetch('/api/search?q=' + encodeURIComponent(query))
+                .then(function(r) { return r.json(); })
+                .then(function(results) {
+                    if (results.length === 0) {
+                        resultsDiv.innerHTML = '<div class="search-no-results">No results found</div>';
+                        resultsDiv.style.display = 'block';
+                        return;
+                    }
+                    var html = '';
+                    results.forEach(function(r) {
+                        html += '<a class="search-result" href="' + r.path + '">';
+                        html += '<div class="search-result-title">' + escapeHtml(r.title) + '</div>';
+                        html += '<div class="search-result-snippet">' + escapeHtml(r.snippet) + '</div>';
+                        html += '</a>';
+                    });
+                    resultsDiv.innerHTML = html;
+                    resultsDiv.style.display = 'block';
+                });
+        }, 200);
+    });
+
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.search-box')) {
+            resultsDiv.style.display = 'none';
+        }
+    });
+
+    input.addEventListener('focus', function() {
+        if (resultsDiv.innerHTML) resultsDiv.style.display = 'block';
+    });
+
+    function escapeHtml(text) {
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+})();
+`
+
 const pageTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -51,6 +105,10 @@ const pageTemplate = `<!DOCTYPE html>
     <nav class="nav-buttons">
         <button onclick="history.back()" class="nav-btn">Back</button>
         <a href="/"><button class="nav-btn">Home</button></a>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search..." autocomplete="off">
+            <div id="search-results" class="search-results"></div>
+        </div>
         <span class="current-path">{{.Path}}</span>
         <button onclick="window.print()" class="nav-btn print-btn">Print</button>
     </nav>
@@ -73,6 +131,7 @@ const pageTemplate = `<!DOCTYPE html>
         });
         mermaid.init(undefined, '.mermaid');
     </script>
+    <script>` + searchJS + `</script>
 </body>
 </html>`
 
@@ -87,6 +146,10 @@ const indexTemplate = `<!DOCTYPE html>
 <body>
     <nav class="nav-buttons">
         <span class="nav-title">{{.SiteTitle}}</span>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search..." autocomplete="off">
+            <div id="search-results" class="search-results"></div>
+        </div>
     </nav>
     <main class="content index-content">
         <h1>File Index</h1>
@@ -95,5 +158,6 @@ const indexTemplate = `<!DOCTYPE html>
     <footer class="site-footer">
         Documentation created by gomdoc: <a href="https://github.com/lacrioque/gomdoc/">https://github.com/lacrioque/gomdoc/</a>
     </footer>
+    <script>` + searchJS + `</script>
 </body>
 </html>`

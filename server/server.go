@@ -2,6 +2,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -12,6 +13,7 @@ import (
 
 	"gomdoc/renderer"
 	"gomdoc/scanner"
+	"gomdoc/search"
 	"gomdoc/templates"
 )
 
@@ -23,6 +25,7 @@ type Server struct {
 	authUser string
 	authPass string
 	renderer *renderer.Renderer
+	index    *search.Index
 }
 
 // New creates a new Server instance.
@@ -34,14 +37,23 @@ func New(baseDir string, port int, title, authUser, authPass string) *Server {
 		authUser: authUser,
 		authPass: authPass,
 		renderer: renderer.New(),
+		index:    search.NewIndex(),
 	}
 }
 
 // Start starts the HTTP server.
 func (s *Server) Start() error {
+	// Build search index at startup
+	if err := s.index.Build(s.baseDir); err != nil {
+		log.Printf("Warning: failed to build search index: %v", err)
+	} else {
+		log.Printf("Search index built successfully")
+	}
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", s.handleRequest)
+	mux.HandleFunc("/api/search", s.handleSearch)
 	mux.HandleFunc("/static/", s.handleStatic)
 
 	addr := fmt.Sprintf(":%d", s.port)
@@ -172,6 +184,24 @@ func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.NotFound(w, r)
+}
+
+// handleSearch responds with JSON search results for a query parameter.
+func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("[]"))
+		return
+	}
+
+	results := s.index.Search(query, 20)
+	if results == nil {
+		results = []search.Result{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(results)
 }
 
 // styleCSS is the embedded CSS for styling the pages.
@@ -364,6 +394,79 @@ body {
     text-align: center;
 }
 
+/* Search */
+.search-box {
+    position: relative;
+    flex: 1;
+    max-width: 300px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    outline: none;
+}
+
+.search-box input:focus {
+    border-color: #0066cc;
+    box-shadow: 0 0 0 2px rgba(0,102,204,0.2);
+}
+
+.search-results {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-top: 4px;
+    max-height: 400px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 100;
+}
+
+.search-result {
+    display: block;
+    padding: 10px 12px;
+    text-decoration: none;
+    border-bottom: 1px solid #f0f0f0;
+    color: inherit;
+}
+
+.search-result:last-child {
+    border-bottom: none;
+}
+
+.search-result:hover {
+    background-color: #f5f8ff;
+}
+
+.search-result-title {
+    font-weight: 600;
+    color: #0066cc;
+    font-size: 14px;
+}
+
+.search-result-snippet {
+    font-size: 12px;
+    color: #666;
+    margin-top: 2px;
+    line-height: 1.4;
+}
+
+.search-no-results {
+    padding: 12px;
+    color: #888;
+    font-size: 14px;
+    text-align: center;
+}
+
 /* Index page */
 .index-content h1 {
     margin-top: 0;
@@ -408,7 +511,7 @@ body {
         padding: 12mm 16mm 24mm 12mm;
     }
         
-    .nav-buttons {
+    .nav-buttons, .search-box {
         display: none !important;
     }
 

@@ -1,0 +1,282 @@
+// Package mcpserver provides an MCP (Model Context Protocol) server
+// that exposes gomdoc's documentation content to AI assistants.
+// It offers keyword search, headline browsing, section reading,
+// and document structure navigation as an external memory for AI agents.
+package mcpserver
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"gomdoc/renderer"
+	"gomdoc/scanner"
+	"gomdoc/search"
+)
+
+// Server wraps the MCP server with access to the documentation directory.
+type Server struct {
+	baseDir string
+	index   *search.Index
+	mcp     *mcp.Server
+}
+
+// New creates a new MCP server for the given documentation directory.
+func New(baseDir string) *Server {
+	s := &Server{
+		baseDir: baseDir,
+		index:   search.NewIndex(),
+	}
+
+	s.mcp = mcp.NewServer(&mcp.Implementation{
+		Name:    "gomdoc",
+		Version: "2.0.0",
+	}, nil)
+
+	s.registerTools()
+	return s
+}
+
+// Run builds the search index and starts the MCP server on stdio.
+func (s *Server) Run(ctx context.Context) error {
+	if err := s.index.Build(s.baseDir); err != nil {
+		return fmt.Errorf("building search index: %w", err)
+	}
+
+	return s.mcp.Run(ctx, &mcp.StdioTransport{})
+}
+
+// --- Argument types ---
+
+// listArgs are the input parameters for the list_documents tool.
+type listArgs struct {
+	Path string `json:"path,omitempty" jsonschema:"description=Optional subdirectory path to list. Leave empty for root."`
+}
+
+// readArgs are the input parameters for the read_document tool.
+type readArgs struct {
+	Path string `json:"path" jsonschema:"required,description=Document path as shown by list_documents (e.g. 'guide' or 'sub/nested')."`
+}
+
+// searchArgs are the input parameters for the search_documents tool.
+type searchArgs struct {
+	Query      string `json:"query" jsonschema:"required,description=Text to search for across all documents. Supports multi-word keyword queries ranked by relevance."`
+	MaxResults int    `json:"max_results,omitempty" jsonschema:"description=Maximum number of results to return. Default 10."`
+}
+
+// outlineArgs are the input parameters for the get_outline tool.
+type outlineArgs struct {
+	Path string `json:"path" jsonschema:"required,description=Document path to get the outline for (e.g. 'guide' or 'sub/nested')."`
+}
+
+// sectionArgs are the input parameters for the read_section tool.
+type sectionArgs struct {
+	Path    string `json:"path" jsonschema:"required,description=Document path containing the section."`
+	Heading string `json:"heading" jsonschema:"required,description=Heading text to find (case-insensitive partial match). Returns the content under that heading."`
+}
+
+// registerTools sets up all MCP tools on the server.
+func (s *Server) registerTools() {
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "list_documents",
+		Description: "List all available markdown documents. Returns document titles and paths that can be used with other tools.",
+	}, s.handleListDocuments)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "read_document",
+		Description: "Read the full content of a markdown document. Returns the raw markdown text and frontmatter metadata. Use get_outline first to understand the structure, then read_section for targeted access.",
+	}, s.handleReadDocument)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "search_documents",
+		Description: "Search across all documents using keyword matching with relevance ranking. Multi-word queries match independently and results are scored by keyword frequency, title matches, and heading matches. Use this to find relevant documentation by topic.",
+	}, s.handleSearchDocuments)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "get_outline",
+		Description: "Get the heading structure (table of contents) of a document. Returns all headings with their levels and line numbers. Use this to understand document structure before reading specific sections.",
+	}, s.handleGetOutline)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "browse_topics",
+		Description: "Browse all headings across all documents as a topic index. Returns a structured overview of every document's headings, useful for discovering what documentation covers without reading full content. This is your starting point for exploring the documentation.",
+	}, s.handleBrowseTopics)
+
+	mcp.AddTool(s.mcp, &mcp.Tool{
+		Name:        "read_section",
+		Description: "Read a specific section of a document by heading text. Returns only the content under the matched heading, up to the next heading of equal or higher level. Use this for targeted reading instead of loading entire documents.",
+	}, s.handleReadSection)
+}
+
+// handleListDocuments returns a list of all available documents.
+func (s *Server) handleListDocuments(_ context.Context, _ *mcp.CallToolRequest, args listArgs) (*mcp.CallToolResult, any, error) {
+	scanDir := s.baseDir
+	if args.Path != "" {
+		scanDir = filepath.Join(s.baseDir, filepath.Clean(args.Path))
+	}
+
+	entries, err := scanner.ScanDirectory(scanDir)
+	if err != nil {
+		return nil, nil, fmt.Errorf("scanning directory: %w", err)
+	}
+
+	var lines []string
+	for _, entry := range entries {
+		urlPath := strings.TrimSuffix(entry.RelPath, filepath.Ext(entry.RelPath))
+		if args.Path != "" {
+			urlPath = args.Path + "/" + urlPath
+		}
+		lines = append(lines, fmt.Sprintf("- %s (path: %s)", entry.Name, filepath.ToSlash(urlPath)))
+	}
+
+	if len(lines) == 0 {
+		return textResult("No documents found."), nil, nil
+	}
+
+	return textResult(strings.Join(lines, "\n")), nil, nil
+}
+
+// handleReadDocument reads and returns a single document's content.
+func (s *Server) handleReadDocument(_ context.Context, _ *mcp.CallToolRequest, args readArgs) (*mcp.CallToolResult, any, error) {
+	if args.Path == "" {
+		return textResult("Error: path is required."), nil, nil
+	}
+
+	cleanPath := filepath.Clean(args.Path)
+	filePath := filepath.Join(s.baseDir, cleanPath+".md")
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		// Try uppercase extension
+		filePath = filepath.Join(s.baseDir, cleanPath+".MD")
+		content, err = os.ReadFile(filePath)
+		if err != nil {
+			return textResult(fmt.Sprintf("Document not found: %s", args.Path)), nil, nil
+		}
+	}
+
+	frontmatter, body := renderer.ParseFrontmatter(content)
+
+	var header string
+	if frontmatter.Title != "" || frontmatter.Author != "" {
+		header = "---\n"
+		if frontmatter.Title != "" {
+			header += fmt.Sprintf("title: %s\n", frontmatter.Title)
+		}
+		if frontmatter.Author != "" {
+			header += fmt.Sprintf("author: %s\n", frontmatter.Author)
+		}
+		header += "---\n\n"
+	}
+
+	return textResult(header + string(body)), nil, nil
+}
+
+// handleSearchDocuments performs keyword search with relevance ranking.
+func (s *Server) handleSearchDocuments(_ context.Context, _ *mcp.CallToolRequest, args searchArgs) (*mcp.CallToolResult, any, error) {
+	if args.Query == "" {
+		return textResult("Error: query is required."), nil, nil
+	}
+
+	maxResults := args.MaxResults
+	if maxResults <= 0 {
+		maxResults = 10
+	}
+
+	results := s.index.SearchKeywords(args.Query, maxResults)
+	if len(results) == 0 {
+		return textResult("No results found."), nil, nil
+	}
+
+	var lines []string
+	for _, r := range results {
+		lines = append(lines, fmt.Sprintf("## %s (score: %.1f)\nPath: %s\n> %s\n", r.Title, r.Score, r.Path, r.Snippet))
+	}
+
+	return textResult(strings.Join(lines, "\n")), nil, nil
+}
+
+// handleGetOutline returns the heading structure of a document.
+func (s *Server) handleGetOutline(_ context.Context, _ *mcp.CallToolRequest, args outlineArgs) (*mcp.CallToolResult, any, error) {
+	if args.Path == "" {
+		return textResult("Error: path is required."), nil, nil
+	}
+
+	// Normalize path format
+	docPath := args.Path
+	if !strings.HasPrefix(docPath, "/") {
+		docPath = "/" + docPath
+	}
+
+	outline, found := s.index.Outline(docPath)
+	if !found {
+		return textResult(fmt.Sprintf("Document not found: %s", args.Path)), nil, nil
+	}
+
+	if len(outline.Headings) == 0 {
+		return textResult(fmt.Sprintf("# %s\nNo headings found in this document.", outline.Title)), nil, nil
+	}
+
+	var lines []string
+	lines = append(lines, fmt.Sprintf("# %s\n", outline.Title))
+	for _, h := range outline.Headings {
+		indent := strings.Repeat("  ", h.Level-1)
+		lines = append(lines, fmt.Sprintf("%s- %s (line %d)", indent, h.Text, h.Line))
+	}
+
+	return textResult(strings.Join(lines, "\n")), nil, nil
+}
+
+// handleBrowseTopics returns all headings across all documents.
+func (s *Server) handleBrowseTopics(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+	topics := s.index.AllTopics()
+
+	if len(topics) == 0 {
+		return textResult("No topics found."), nil, nil
+	}
+
+	var lines []string
+	for _, doc := range topics {
+		lines = append(lines, fmt.Sprintf("## %s [%s]", doc.Title, doc.Path))
+		for _, h := range doc.Headings {
+			indent := strings.Repeat("  ", h.Level-1)
+			lines = append(lines, fmt.Sprintf("%s- %s", indent, h.Text))
+		}
+		lines = append(lines, "")
+	}
+
+	return textResult(strings.Join(lines, "\n")), nil, nil
+}
+
+// handleReadSection returns the content under a specific heading.
+func (s *Server) handleReadSection(_ context.Context, _ *mcp.CallToolRequest, args sectionArgs) (*mcp.CallToolResult, any, error) {
+	if args.Path == "" || args.Heading == "" {
+		return textResult("Error: both path and heading are required."), nil, nil
+	}
+
+	docPath := args.Path
+	if !strings.HasPrefix(docPath, "/") {
+		docPath = "/" + docPath
+	}
+
+	section, found := s.index.FindSection(docPath, args.Heading)
+	if !found {
+		return textResult(fmt.Sprintf("Section not found: heading '%s' in document '%s'", args.Heading, args.Path)), nil, nil
+	}
+
+	header := fmt.Sprintf("%s %s\n\n", strings.Repeat("#", section.Level), section.Heading)
+	return textResult(header + section.Content), nil, nil
+}
+
+// textResult creates a simple text content result.
+func textResult(text string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: text},
+		},
+	}
+}

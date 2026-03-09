@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gomdoc/mcpserver"
 	"gomdoc/server"
 )
 
@@ -18,6 +20,7 @@ func main() {
 	dir := flag.String("dir", ".", "Base directory to serve markdown files from")
 	title := flag.String("title", "gomdoc", "Custom title for the documentation site")
 	auth := flag.String("auth", "", "Basic auth credentials in user:password format")
+	mcpMode := flag.Bool("mcp", false, "Run as MCP server over stdio instead of HTTP")
 	flag.Parse()
 
 	// Validate auth format if provided
@@ -43,6 +46,15 @@ func main() {
 	}
 	if !info.IsDir() {
 		log.Fatalf("Path is not a directory: %s", baseDir)
+	}
+
+	// Run as MCP server if requested
+	if *mcpMode {
+		mcp := mcpserver.New(baseDir)
+		if err := mcp.Run(context.Background()); err != nil {
+			log.Fatalf("MCP server error: %v", err)
+		}
+		return
 	}
 
 	fmt.Println("gomdoc - Markdown Documentation Server")
