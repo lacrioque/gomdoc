@@ -24,12 +24,12 @@ A lightweight Go-based markdown documentation server that renders `.md` files as
 curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh
 
 # Install a specific version
-curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh -s -- v2.0.0
-```
+curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh -s -- v2.0.1
 
-You can set a custom install directory with the `INSTALL_DIR` environment variable:
+# List available versions
+curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh -s -- --list
 
-```bash
+# Custom install directory
 INSTALL_DIR=~/.local/bin curl -fsSL https://raw.githubusercontent.com/lacrioque/gomdoc/main/install.sh | sh
 ```
 
