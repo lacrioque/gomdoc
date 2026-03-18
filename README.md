@@ -46,6 +46,12 @@ go build -o gomdoc
 go install
 ```
 
+### Docker
+
+```bash
+docker run -p 7331:7331 -v $(pwd):/docs markusfluer/gomdoc
+```
+
 ### Requirements
 
 - Quick install: `curl`, macOS (Apple Silicon) / Linux (amd64) / Windows (amd64 via MSYS/Cygwin)

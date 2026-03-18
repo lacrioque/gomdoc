@@ -1,0 +1,11 @@
+.git
+.github
+.beads
+.claude
+docs
+mcpserver/*_test.go
+search/*_test.go
+Dockerfile
+.dockerignore
+bin
+dist
