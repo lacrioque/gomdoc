@@ -259,6 +259,126 @@ func TestHandleHelp(t *testing.T) {
 	}
 }
 
+// setupTestDirWithMetadata creates test files with extended frontmatter.
+func setupTestDirWithMetadata(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+
+	files := map[string]string{
+		"api.md":   "---\ntitle: API Reference\nauthor: Jane\nstatus: published\ntags: api, rest\ncategory: engineering\nversion: 1.0\n---\n# API Reference\nREST API documentation.\n\n## Endpoints\nGET /users",
+		"guide.md": "---\ntitle: User Guide\nauthor: Bob\nstatus: draft\ntags: guide, onboarding\n---\n# User Guide\nGetting started.",
+	}
+
+	for name, content := range files {
+		path := filepath.Join(dir, name)
+		os.MkdirAll(filepath.Dir(path), 0o755)
+		os.WriteFile(path, []byte(content), 0o644)
+	}
+
+	return dir
+}
+
+// newTestServerWithMetadata creates a server with metadata-rich test files.
+func newTestServerWithMetadata(t *testing.T) *Server {
+	t.Helper()
+	dir := setupTestDirWithMetadata(t)
+	idx := search.NewIndex()
+	idx.Build(dir)
+
+	return &Server{
+		baseDir: dir,
+		index:   idx,
+	}
+}
+
+func TestHandleBrowseTopicsWithMetadata(t *testing.T) {
+	s := newTestServerWithMetadata(t)
+	ctx := context.Background()
+
+	result, _, err := s.handleBrowseTopics(ctx, nil, struct{}{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+
+	if !strings.Contains(text, "author: Jane") {
+		t.Errorf("expected metadata author in browse_topics, got: %s", text)
+	}
+	if !strings.Contains(text, "status: published") {
+		t.Errorf("expected metadata status in browse_topics, got: %s", text)
+	}
+	if !strings.Contains(text, "tags: [api, rest]") {
+		t.Errorf("expected metadata tags in browse_topics, got: %s", text)
+	}
+}
+
+func TestHandleSearchDocumentsWithTags(t *testing.T) {
+	s := newTestServerWithMetadata(t)
+	ctx := context.Background()
+
+	result, _, err := s.handleSearchDocuments(ctx, nil, searchArgs{Query: "documentation", Tags: []string{"api"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, "API Reference") {
+		t.Errorf("expected API Reference in tag-filtered results, got: %s", text)
+	}
+}
+
+func TestHandleSearchDocumentsTagsOnly(t *testing.T) {
+	s := newTestServerWithMetadata(t)
+	ctx := context.Background()
+
+	result, _, err := s.handleSearchDocuments(ctx, nil, searchArgs{Tags: []string{"guide"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, "User Guide") {
+		t.Errorf("expected User Guide in tag-only results, got: %s", text)
+	}
+}
+
+func TestHandleSearchDocumentsEmptyQueryAndTags(t *testing.T) {
+	s := newTestServerWithMetadata(t)
+	ctx := context.Background()
+
+	result, _, err := s.handleSearchDocuments(ctx, nil, searchArgs{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, "required") {
+		t.Errorf("expected error for empty query and tags, got: %s", text)
+	}
+}
+
+func TestHandleReadDocumentExtendedFrontmatter(t *testing.T) {
+	s := newTestServerWithMetadata(t)
+	ctx := context.Background()
+
+	result, _, err := s.handleReadDocument(ctx, nil, readArgs{Path: "api"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, "status: published") {
+		t.Errorf("expected extended frontmatter in read_document, got: %s", text)
+	}
+	if !strings.Contains(text, "tags: [api, rest]") {
+		t.Errorf("expected tags in read_document, got: %s", text)
+	}
+	if !strings.Contains(text, "version: 1.0") {
+		t.Errorf("expected version in read_document, got: %s", text)
+	}
+}
+
 func TestHandleReadSectionMissingArgs(t *testing.T) {
 	s := newTestServer(t)
 	ctx := context.Background()

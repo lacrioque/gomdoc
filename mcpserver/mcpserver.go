@@ -76,8 +76,9 @@ type readArgs struct {
 
 // searchArgs are the input parameters for the search_documents tool.
 type searchArgs struct {
-	Query      string `json:"query" jsonschema:"text to search for across all documents, supports multi-word keyword queries"`
-	MaxResults int    `json:"max_results,omitempty" jsonschema:"maximum number of results to return, default 10"`
+	Query      string   `json:"query" jsonschema:"text to search for across all documents, supports multi-word keyword queries"`
+	MaxResults int      `json:"max_results,omitempty" jsonschema:"maximum number of results to return, default 10"`
+	Tags       []string `json:"tags,omitempty" jsonschema:"optional list of tags to filter results, only documents with at least one matching tag are returned"`
 }
 
 // outlineArgs are the input parameters for the get_outline tool.
@@ -110,7 +111,7 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "search_documents",
-		Description: "Search across all documents using keyword matching with relevance ranking. Multi-word queries match independently and results are scored by keyword frequency, title matches, and heading matches. Use this to find relevant documentation by topic.",
+		Description: "Search across all documents using keyword matching with relevance ranking. Multi-word queries match independently and results are scored by keyword frequency, title matches, and heading matches. Optionally filter by tags to narrow results. Use this to find relevant documentation by topic.",
 	}, s.handleSearchDocuments)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -120,7 +121,7 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
 		Name:        "browse_topics",
-		Description: "Browse all headings across all documents as a topic index. Returns a structured overview of every document's headings, useful for discovering what documentation covers without reading full content. This is your starting point for exploring the documentation.",
+		Description: "Browse all headings across all documents as a topic index. Returns a structured overview of every document's headings with frontmatter metadata (tags, status, author, date, category, version), useful for discovering what documentation covers and filtering by metadata. This is your starting point for exploring the documentation.",
 	}, s.handleBrowseTopics)
 
 	mcp.AddTool(s.mcp, &mcp.Tool{
@@ -266,25 +267,14 @@ func (s *Server) handleReadDocument(_ context.Context, _ *mcp.CallToolRequest, a
 
 	frontmatter, body := renderer.ParseFrontmatter(content)
 
-	var header string
-	if frontmatter.Title != "" || frontmatter.Author != "" {
-		header = "---\n"
-		if frontmatter.Title != "" {
-			header += fmt.Sprintf("title: %s\n", frontmatter.Title)
-		}
-		if frontmatter.Author != "" {
-			header += fmt.Sprintf("author: %s\n", frontmatter.Author)
-		}
-		header += "---\n\n"
-	}
-
+	header := renderFrontmatterHeader(frontmatter)
 	return textResult(header + string(body)), nil, nil
 }
 
-// handleSearchDocuments performs keyword search with relevance ranking.
+// handleSearchDocuments performs keyword search with relevance ranking and optional tag filtering.
 func (s *Server) handleSearchDocuments(_ context.Context, _ *mcp.CallToolRequest, args searchArgs) (*mcp.CallToolResult, any, error) {
-	if args.Query == "" {
-		return textResult("Error: query is required."), nil, nil
+	if args.Query == "" && len(args.Tags) == 0 {
+		return textResult("Error: query or tags parameter is required."), nil, nil
 	}
 
 	maxResults := args.MaxResults
@@ -292,14 +282,18 @@ func (s *Server) handleSearchDocuments(_ context.Context, _ *mcp.CallToolRequest
 		maxResults = 10
 	}
 
-	results := s.index.SearchKeywords(args.Query, maxResults)
+	results := s.index.SearchKeywordsWithTags(args.Query, args.Tags, maxResults)
 	if len(results) == 0 {
 		return textResult("No results found."), nil, nil
 	}
 
 	var lines []string
 	for _, r := range results {
-		lines = append(lines, fmt.Sprintf("## %s (score: %.1f)\nPath: %s\n> %s\n", r.Title, r.Score, r.Path, r.Snippet))
+		if r.Score > 0 {
+			lines = append(lines, fmt.Sprintf("## %s (score: %.1f)\nPath: %s\n> %s\n", r.Title, r.Score, r.Path, r.Snippet))
+		} else {
+			lines = append(lines, fmt.Sprintf("## %s\nPath: %s\n", r.Title, r.Path))
+		}
 	}
 
 	return textResult(strings.Join(lines, "\n")), nil, nil
@@ -336,7 +330,7 @@ func (s *Server) handleGetOutline(_ context.Context, _ *mcp.CallToolRequest, arg
 	return textResult(strings.Join(lines, "\n")), nil, nil
 }
 
-// handleBrowseTopics returns all headings across all documents.
+// handleBrowseTopics returns all headings across all documents with metadata.
 func (s *Server) handleBrowseTopics(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
 	topics := s.index.AllTopics()
 
@@ -347,6 +341,12 @@ func (s *Server) handleBrowseTopics(_ context.Context, _ *mcp.CallToolRequest, _
 	var lines []string
 	for _, doc := range topics {
 		lines = append(lines, fmt.Sprintf("## %s [%s]", doc.Title, doc.Path))
+
+		meta := formatMetadata(doc.Meta)
+		if meta != "" {
+			lines = append(lines, meta)
+		}
+
 		for _, h := range doc.Headings {
 			indent := strings.Repeat("  ", h.Level-1)
 			lines = append(lines, fmt.Sprintf("%s- %s", indent, h.Text))
@@ -355,6 +355,40 @@ func (s *Server) handleBrowseTopics(_ context.Context, _ *mcp.CallToolRequest, _
 	}
 
 	return textResult(strings.Join(lines, "\n")), nil, nil
+}
+
+// formatMetadata formats metadata fields as a compact display line.
+// Returns empty string if no metadata fields are set.
+func formatMetadata(meta search.Metadata) string {
+	var parts []string
+
+	if meta.Author != "" {
+		parts = append(parts, fmt.Sprintf("author: %s", meta.Author))
+	}
+	if meta.Status != "" {
+		parts = append(parts, fmt.Sprintf("status: %s", meta.Status))
+	}
+	if meta.Date != "" {
+		parts = append(parts, fmt.Sprintf("date: %s", meta.Date))
+	}
+	if len(meta.Tags) > 0 {
+		parts = append(parts, fmt.Sprintf("tags: [%s]", strings.Join(meta.Tags, ", ")))
+	}
+	if meta.Category != "" {
+		parts = append(parts, fmt.Sprintf("category: %s", meta.Category))
+	}
+	if meta.Version != "" {
+		parts = append(parts, fmt.Sprintf("version: %s", meta.Version))
+	}
+	if len(meta.Reviewers) > 0 {
+		parts = append(parts, fmt.Sprintf("reviewers: [%s]", strings.Join(meta.Reviewers, ", ")))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("  __%s__", strings.Join(parts, " | "))
 }
 
 // handleReadSection returns the content under a specific heading.
@@ -375,6 +409,42 @@ func (s *Server) handleReadSection(_ context.Context, _ *mcp.CallToolRequest, ar
 
 	header := fmt.Sprintf("%s %s\n\n", strings.Repeat("#", section.Level), section.Heading)
 	return textResult(header + section.Content), nil, nil
+}
+
+// renderFrontmatterHeader formats all non-empty frontmatter fields as a YAML header block.
+func renderFrontmatterHeader(fm renderer.Frontmatter) string {
+	var fields []string
+
+	if fm.Title != "" {
+		fields = append(fields, fmt.Sprintf("title: %s", fm.Title))
+	}
+	if fm.Author != "" {
+		fields = append(fields, fmt.Sprintf("author: %s", fm.Author))
+	}
+	if fm.Status != "" {
+		fields = append(fields, fmt.Sprintf("status: %s", fm.Status))
+	}
+	if fm.Date != "" {
+		fields = append(fields, fmt.Sprintf("date: %s", fm.Date))
+	}
+	if len(fm.Tags) > 0 {
+		fields = append(fields, fmt.Sprintf("tags: [%s]", strings.Join(fm.Tags, ", ")))
+	}
+	if fm.Category != "" {
+		fields = append(fields, fmt.Sprintf("category: %s", fm.Category))
+	}
+	if fm.Version != "" {
+		fields = append(fields, fmt.Sprintf("version: %s", fm.Version))
+	}
+	if len(fm.Reviewers) > 0 {
+		fields = append(fields, fmt.Sprintf("reviewers: [%s]", strings.Join(fm.Reviewers, ", ")))
+	}
+
+	if len(fields) == 0 {
+		return ""
+	}
+
+	return "---\n" + strings.Join(fields, "\n") + "\n---\n\n"
 }
 
 // textResult creates a simple text content result.
