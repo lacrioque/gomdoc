@@ -88,6 +88,56 @@ const themeJS = `
 })();
 `
 
+const codeBlockJS = `
+(function() {
+    document.querySelectorAll('pre > code').forEach(function(codeEl) {
+        var pre = codeEl.parentElement;
+
+        // Skip mermaid blocks (they get replaced by the mermaid script)
+        if (codeEl.classList.contains('language-mermaid')) {
+            return;
+        }
+
+        // Wrap pre in a container for positioning the copy button
+        var wrapper = document.createElement('div');
+        wrapper.className = 'code-block-wrapper';
+        pre.parentNode.insertBefore(wrapper, pre);
+        wrapper.appendChild(pre);
+
+        // Add copy button
+        var btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.textContent = 'Copy';
+        btn.setAttribute('aria-label', 'Copy code to clipboard');
+        btn.addEventListener('click', function() {
+            var text = codeEl.textContent;
+            navigator.clipboard.writeText(text).then(function() {
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(function() {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        });
+        wrapper.appendChild(btn);
+
+        // Add line numbers: wrap each line in a span
+        var lines = codeEl.innerHTML.split('\n');
+        // Remove trailing empty line (common in code blocks)
+        if (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+            lines.pop();
+        }
+        if (lines.length > 1) {
+            pre.classList.add('line-numbers');
+            codeEl.innerHTML = lines.map(function(line) {
+                return '<span class="line">' + line + '</span>';
+            }).join('\n');
+        }
+    });
+})();
+`
+
 const searchJS = `
 (function() {
     var input = document.getElementById('search-input');
@@ -191,6 +241,7 @@ const pageTemplate = `<!DOCTYPE html>
         });
         mermaid.init(undefined, '.mermaid');
     </script>
+    <script>` + codeBlockJS + `</script>
     <script>` + searchJS + `</script>
 </body>
 </html>`

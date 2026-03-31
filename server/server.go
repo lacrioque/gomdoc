@@ -469,12 +469,70 @@ body {
     font-size: 0.9em;
 }
 
+/* Code block wrapper for copy button and line numbers */
+.code-block-wrapper {
+    position: relative;
+    margin: 1em 0;
+}
+
+.code-block-wrapper .copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.1);
+    color: #abb2bf;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s;
+    z-index: 1;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.code-block-wrapper:hover .copy-btn {
+    opacity: 1;
+}
+
+.code-block-wrapper .copy-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.code-block-wrapper .copy-btn.copied {
+    color: #98c379;
+    border-color: #98c379;
+}
+
 .content pre {
     background-color: var(--color-pre-bg);
     color: var(--color-pre-text);
     padding: 16px;
     border-radius: 6px;
     overflow-x: auto;
+    margin: 0;
+    counter-reset: line-number;
+}
+
+.content pre.line-numbers code {
+    counter-reset: line-number;
+}
+
+.content pre.line-numbers code .line {
+    display: block;
+    counter-increment: line-number;
+}
+
+.content pre.line-numbers code .line::before {
+    content: counter(line-number);
+    display: inline-block;
+    width: 3em;
+    margin-right: 1em;
+    text-align: right;
+    color: rgba(171,178,191,0.4);
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .content pre code {
@@ -850,10 +908,18 @@ body {
         background: white;
     }
 
+    .copy-btn {
+        display: none !important;
+    }
+
     .content pre {
         background-color: #f5f5f5 !important;
         color: #333 !important;
         border: 1px solid #ddd;
+    }
+
+    .content pre.line-numbers code .line::before {
+        color: #999 !important;
     }
 
     a {
