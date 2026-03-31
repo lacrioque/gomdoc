@@ -288,6 +288,70 @@ func TestTokenizeSkipsShort(t *testing.T) {
 	}
 }
 
+func TestEditDistance(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want int
+	}{
+		{"hello", "hello", 0},
+		{"hello", "helo", 1},
+		{"hello", "jello", 1},
+		{"kitten", "sitting", 3},
+		{"", "abc", 3},
+		{"abc", "", 3},
+		{"config", "cnofig", 2}, // transposition-like typo
+	}
+
+	for _, tt := range tests {
+		got := editDistance(tt.a, tt.b)
+		if got != tt.want {
+			t.Errorf("editDistance(%q, %q) = %d, want %d", tt.a, tt.b, got, tt.want)
+		}
+	}
+}
+
+func TestSearchKeywordsPrefixMatch(t *testing.T) {
+	dir := setupTestDir(t)
+	idx := NewIndex()
+	idx.Build(dir)
+
+	// "greet" is a prefix of "greeting" and "greetings" in hello.md
+	results := idx.SearchKeywords("greet", 10)
+	if len(results) == 0 {
+		t.Fatal("expected prefix match results for 'greet'")
+	}
+	if results[0].Path != "/hello" {
+		t.Errorf("expected '/hello' as top result for prefix 'greet', got '%s'", results[0].Path)
+	}
+}
+
+func TestSearchKeywordsFuzzyMatch(t *testing.T) {
+	dir := setupTestDir(t)
+	idx := NewIndex()
+	idx.Build(dir)
+
+	// "instlalation" is a typo for "installation" (edit distance 2)
+	results := idx.SearchKeywords("instlalation", 10)
+	if len(results) == 0 {
+		t.Fatal("expected fuzzy match results for 'instlalation'")
+	}
+	if results[0].Title != "User Guide" {
+		t.Errorf("expected 'User Guide' for fuzzy match, got '%s'", results[0].Title)
+	}
+}
+
+func TestSearchKeywordsNoFuzzyForShortWords(t *testing.T) {
+	dir := setupTestDir(t)
+	idx := NewIndex()
+	idx.Build(dir)
+
+	// Short words (< 4 chars) should not trigger fuzzy matching
+	results := idx.SearchKeywords("xyz", 10)
+	if len(results) != 0 {
+		t.Errorf("expected no fuzzy results for short word 'xyz', got %d", len(results))
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && contains(s, substr)
 }

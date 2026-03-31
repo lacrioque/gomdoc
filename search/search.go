@@ -337,40 +337,22 @@ func buildKeywordMap(text string) map[string]int {
 
 // scoreDocument calculates a relevance score for a document against keywords.
 // Returns the score and the byte position of the first keyword match for snippets.
+// Supports exact, prefix, and fuzzy (edit distance <= 2) matching with decreasing weight.
 func scoreDocument(doc document, keywords []string) (float64, int) {
 	var score float64
 	firstPos := -1
 	matchedCount := 0
 
 	for _, kw := range keywords {
-		count, ok := doc.keywords[kw]
-		if !ok {
+		kwScore, pos := scoreKeyword(doc, kw)
+		if kwScore == 0 {
 			continue
 		}
 		matchedCount++
+		score += kwScore
 
-		// Frequency contributes to score, with diminishing returns
-		score += 1.0 + float64(min(count, 10))*0.1
-
-		// Boost for title matches
-		if strings.Contains(strings.ToLower(doc.title), kw) {
-			score += 3.0
-		}
-
-		// Boost for heading matches
-		for _, h := range doc.headings {
-			if strings.Contains(strings.ToLower(h.Text), kw) {
-				score += 2.0
-				break
-			}
-		}
-
-		// Track first occurrence for snippet
-		if firstPos == -1 {
-			pos := strings.Index(doc.content, kw)
-			if pos != -1 {
-				firstPos = pos
-			}
+		if firstPos == -1 && pos != -1 {
+			firstPos = pos
 		}
 	}
 
@@ -384,6 +366,145 @@ func scoreDocument(doc document, keywords []string) (float64, int) {
 	}
 
 	return score, firstPos
+}
+
+// scoreKeyword scores a single keyword against a document.
+// Tries exact match first, then prefix, then fuzzy. Returns score and byte position.
+func scoreKeyword(doc document, kw string) (float64, int) {
+	// Exact match
+	if count, ok := doc.keywords[kw]; ok {
+		s := 1.0 + float64(min(count, 10))*0.1
+		s += titleHeadingBoost(doc, kw)
+		pos := strings.Index(doc.content, kw)
+		return s, pos
+	}
+
+	// Prefix match: keyword is a prefix of a document word (min 3 chars)
+	if len(kw) >= 3 {
+		if s, pos := prefixMatch(doc, kw); s > 0 {
+			return s, pos
+		}
+	}
+
+	// Fuzzy match: edit distance for typo tolerance (min 4 chars)
+	if len(kw) >= 4 {
+		if s, pos := fuzzyMatch(doc, kw); s > 0 {
+			return s, pos
+		}
+	}
+
+	return 0, -1
+}
+
+// prefixMatch finds document words that start with the keyword prefix.
+// Returns a reduced score (0.6x) since prefix matches are less precise.
+func prefixMatch(doc document, prefix string) (float64, int) {
+	var totalCount int
+	for word, count := range doc.keywords {
+		if strings.HasPrefix(word, prefix) {
+			totalCount += count
+		}
+	}
+
+	if totalCount == 0 {
+		return 0, -1
+	}
+
+	score := 0.6 * (1.0 + float64(min(totalCount, 10))*0.1)
+	score += 0.6 * titleHeadingBoost(doc, prefix)
+	pos := strings.Index(doc.content, prefix)
+	return score, pos
+}
+
+// fuzzyMatch finds document words within edit distance 1-2 of the keyword.
+// Returns a reduced score (0.3x) since fuzzy matches may be false positives.
+func fuzzyMatch(doc document, kw string) (float64, int) {
+	bestCount := 0
+	bestWord := ""
+
+	for word, count := range doc.keywords {
+		dist := editDistance(kw, word)
+		if dist == 0 || dist > maxEditDistance(kw) {
+			continue
+		}
+		if count > bestCount {
+			bestCount = count
+			bestWord = word
+		}
+	}
+
+	if bestCount == 0 {
+		return 0, -1
+	}
+
+	score := 0.3 * (1.0 + float64(min(bestCount, 10))*0.1)
+	pos := strings.Index(doc.content, bestWord)
+	return score, pos
+}
+
+// maxEditDistance returns the allowed edit distance based on keyword length.
+func maxEditDistance(kw string) int {
+	if len(kw) <= 5 {
+		return 1
+	}
+	return 2
+}
+
+// titleHeadingBoost returns bonus score for keywords found in title or headings.
+func titleHeadingBoost(doc document, kw string) float64 {
+	var boost float64
+	if strings.Contains(strings.ToLower(doc.title), kw) {
+		boost += 3.0
+	}
+	for _, h := range doc.headings {
+		if strings.Contains(strings.ToLower(h.Text), kw) {
+			boost += 2.0
+			break
+		}
+	}
+	return boost
+}
+
+// editDistance computes the Levenshtein distance between two strings.
+// Returns early if distance exceeds maxDist (optimization for large vocabularies).
+func editDistance(a, b string) int {
+	ra := []rune(a)
+	rb := []rune(b)
+	la, lb := len(ra), len(rb)
+
+	// Quick rejection: length difference alone exceeds max possible useful distance
+	if abs(la-lb) > 2 {
+		return 3
+	}
+
+	// Use single-row DP for space efficiency
+	prev := make([]int, lb+1)
+	for j := range prev {
+		prev[j] = j
+	}
+
+	for i := 1; i <= la; i++ {
+		curr := make([]int, lb+1)
+		curr[0] = i
+		for j := 1; j <= lb; j++ {
+			cost := 1
+			if ra[i-1] == rb[j-1] {
+				cost = 0
+			}
+			curr[j] = min(curr[j-1]+1, min(prev[j]+1, prev[j-1]+cost))
+		}
+		prev = curr
+	}
+
+	return prev[lb]
+}
+
+// abs returns the absolute value of an integer.
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // extractSection finds a section by heading text and returns its content.

@@ -206,7 +206,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results := s.index.Search(query, 20)
+	results := s.index.SearchKeywords(query, 20)
 	if results == nil {
 		results = []search.Result{}
 	}
