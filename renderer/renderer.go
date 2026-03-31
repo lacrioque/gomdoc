@@ -16,8 +16,14 @@ import (
 
 // Frontmatter holds metadata parsed from YAML frontmatter.
 type Frontmatter struct {
-	Title  string
-	Author string
+	Title     string
+	Author    string
+	Status    string
+	Date      string
+	Tags      []string
+	Category  string
+	Version   string
+	Reviewers []string
 }
 
 // ParseFrontmatter extracts YAML frontmatter from markdown content.
@@ -59,28 +65,81 @@ func ParseFrontmatter(content []byte) (Frontmatter, []byte) {
 
 	// Parse key-value pairs
 	lines := strings.Split(fmBlock, "\n")
+	var currentListKey string
 	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			currentListKey = ""
 			continue
 		}
 
-		parts := strings.SplitN(line, ":", 2)
+		// Handle YAML list items (e.g., "  - value")
+		if strings.HasPrefix(trimmed, "- ") && currentListKey != "" {
+			item := strings.TrimSpace(strings.TrimPrefix(trimmed, "-"))
+			item = strings.Trim(item, "\"'")
+			switch currentListKey {
+			case "tags":
+				fm.Tags = append(fm.Tags, item)
+			case "reviewers":
+				fm.Reviewers = append(fm.Reviewers, item)
+			}
+			continue
+		}
+
+		parts := strings.SplitN(trimmed, ":", 2)
 		if len(parts) != 2 {
+			currentListKey = ""
 			continue
 		}
 
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
+		lowerKey := strings.ToLower(key)
 
 		// Remove surrounding quotes if present
 		value = strings.Trim(value, "\"'")
 
-		switch strings.ToLower(key) {
+		// Check for inline list syntax: [item1, item2]
+		if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+			items := parseInlineList(value)
+			switch lowerKey {
+			case "tags":
+				fm.Tags = items
+			case "reviewers":
+				fm.Reviewers = items
+			}
+			currentListKey = ""
+			continue
+		}
+
+		// If value is empty, the next lines may be YAML list items
+		if value == "" {
+			if lowerKey == "tags" || lowerKey == "reviewers" {
+				currentListKey = lowerKey
+			}
+			continue
+		}
+
+		currentListKey = ""
+
+		// Comma-separated values for list fields
+		switch lowerKey {
 		case "title":
 			fm.Title = value
 		case "author":
 			fm.Author = value
+		case "status":
+			fm.Status = value
+		case "date":
+			fm.Date = value
+		case "tags":
+			fm.Tags = splitAndTrim(value)
+		case "category":
+			fm.Category = value
+		case "version":
+			fm.Version = value
+		case "reviewers":
+			fm.Reviewers = splitAndTrim(value)
 		}
 	}
 
@@ -93,6 +152,27 @@ func ParseFrontmatter(content []byte) (Frontmatter, []byte) {
 	}
 
 	return fm, []byte(remaining)
+}
+
+// splitAndTrim splits a comma-separated string into trimmed, non-empty items.
+func splitAndTrim(s string) []string {
+	parts := strings.Split(s, ",")
+	var result []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		p = strings.Trim(p, "\"'")
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
+}
+
+// parseInlineList parses a YAML inline list like [item1, item2].
+func parseInlineList(s string) []string {
+	s = strings.TrimPrefix(s, "[")
+	s = strings.TrimSuffix(s, "]")
+	return splitAndTrim(s)
 }
 
 // Renderer handles markdown to HTML conversion.

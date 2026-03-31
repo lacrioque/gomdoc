@@ -4,6 +4,7 @@ package templates
 import (
 	"html/template"
 	"io"
+	"strings"
 )
 
 // PageData holds data for rendering a markdown page.
@@ -11,8 +12,30 @@ type PageData struct {
 	Title     string
 	SiteTitle string
 	Author    string
+	Status    string
+	Date      string
+	Tags      []string
+	Category  string
+	Version   string
+	Reviewers []string
 	Content   template.HTML
 	Path      string
+}
+
+// JoinTags returns tags as a comma-separated string.
+func (p PageData) JoinTags() string {
+	return strings.Join(p.Tags, ", ")
+}
+
+// JoinReviewers returns reviewers as a comma-separated string.
+func (p PageData) JoinReviewers() string {
+	return strings.Join(p.Reviewers, ", ")
+}
+
+// HasMetadata returns true if any extended metadata field is set.
+func (p PageData) HasMetadata() bool {
+	return p.Status != "" || p.Date != "" || len(p.Tags) > 0 ||
+		p.Category != "" || p.Version != "" || len(p.Reviewers) > 0
 }
 
 // IndexData holds data for rendering the index page.
@@ -112,6 +135,14 @@ const pageTemplate = `<!DOCTYPE html>
         <span class="current-path">{{.Path}}</span>
         <button onclick="window.print()" class="nav-btn print-btn">Print</button>
     </nav>
+    {{if .HasMetadata}}<div class="doc-metadata">
+        {{if .Status}}<span class="meta-item meta-status meta-status-{{.Status}}">{{.Status}}</span>{{end}}
+        {{if .Category}}<span class="meta-item meta-category">{{.Category}}</span>{{end}}
+        {{if .Version}}<span class="meta-item meta-version">v{{.Version}}</span>{{end}}
+        {{if .Date}}<span class="meta-item meta-date">{{.Date}}</span>{{end}}
+        {{if .Tags}}<span class="meta-item meta-tags">{{.JoinTags}}</span>{{end}}
+        {{if .Reviewers}}<span class="meta-item meta-reviewers">Reviewers: {{.JoinReviewers}}</span>{{end}}
+    </div>{{end}}
     <main class="content">
         {{.Content}}
     </main>

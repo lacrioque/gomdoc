@@ -17,6 +17,24 @@ import (
 	"gomdoc/scanner"
 )
 
+// Metadata holds extended frontmatter fields for search results and outlines.
+type Metadata struct {
+	// Author is the document author.
+	Author string `json:"author,omitempty"`
+	// Status is the document lifecycle status (draft, review, approved, deprecated).
+	Status string `json:"status,omitempty"`
+	// Date is the document date.
+	Date string `json:"date,omitempty"`
+	// Tags is a list of classification tags.
+	Tags []string `json:"tags,omitempty"`
+	// Category is the document category.
+	Category string `json:"category,omitempty"`
+	// Version is the document version.
+	Version string `json:"version,omitempty"`
+	// Reviewers is a list of document reviewers.
+	Reviewers []string `json:"reviewers,omitempty"`
+}
+
 // Result represents a single search match.
 type Result struct {
 	// Title is the document title (from frontmatter or filename).
@@ -27,6 +45,8 @@ type Result struct {
 	Snippet string `json:"snippet"`
 	// Score indicates relevance (higher is better). Only set by keyword search.
 	Score float64 `json:"score,omitempty"`
+	// Meta holds extended frontmatter metadata.
+	Meta Metadata `json:"meta,omitempty"`
 }
 
 // Heading represents a parsed markdown heading within a document.
@@ -47,6 +67,8 @@ type DocumentOutline struct {
 	Path string `json:"path"`
 	// Headings is the ordered list of headings in the document.
 	Headings []Heading `json:"headings"`
+	// Meta holds extended frontmatter metadata.
+	Meta Metadata `json:"meta,omitempty"`
 }
 
 // Section holds the content under a specific heading.
@@ -63,10 +85,11 @@ type Section struct {
 type document struct {
 	title    string
 	path     string
-	content  string    // lowercased plain text for searching
-	raw      string    // original text for snippet extraction
-	headings []Heading // parsed headings with line numbers
+	content  string         // lowercased plain text for searching
+	raw      string         // original text for snippet extraction
+	headings []Heading      // parsed headings with line numbers
 	keywords map[string]int // word frequency map for keyword search
+	meta     Metadata       // extended frontmatter metadata
 }
 
 // Index holds the in-memory search index.
@@ -181,6 +204,7 @@ func (idx *Index) SearchKeywords(query string, maxResults int) []Result {
 			Path:    m.doc.path,
 			Snippet: extractSnippet(m.doc.raw, m.pos, queryLen),
 			Score:   m.score,
+			Meta:    m.doc.meta,
 		}
 	}
 
@@ -198,6 +222,7 @@ func (idx *Index) Outline(docPath string) (DocumentOutline, bool) {
 				Title:    doc.title,
 				Path:     doc.path,
 				Headings: doc.headings,
+				Meta:     doc.meta,
 			}, true
 		}
 	}
@@ -219,6 +244,7 @@ func (idx *Index) AllTopics() []DocumentOutline {
 			Title:    doc.title,
 			Path:     doc.path,
 			Headings: doc.headings,
+			Meta:     doc.meta,
 		})
 	}
 
@@ -268,6 +294,24 @@ func indexFile(baseDir string, entry scanner.FileEntry) (document, error) {
 	headings := parseHeadings(raw)
 	keywords := buildKeywordMap(raw)
 
+	// Index frontmatter fields as keywords for searchability
+	metaText := strings.Join(frontmatter.Tags, " ") + " " +
+		frontmatter.Category + " " + frontmatter.Status + " " +
+		strings.Join(frontmatter.Reviewers, " ")
+	for k, v := range buildKeywordMap(metaText) {
+		keywords[k] += v
+	}
+
+	meta := Metadata{
+		Author:    frontmatter.Author,
+		Status:    frontmatter.Status,
+		Date:      frontmatter.Date,
+		Tags:      frontmatter.Tags,
+		Category:  frontmatter.Category,
+		Version:   frontmatter.Version,
+		Reviewers: frontmatter.Reviewers,
+	}
+
 	return document{
 		title:    title,
 		path:     urlPath,
@@ -275,6 +319,7 @@ func indexFile(baseDir string, entry scanner.FileEntry) (document, error) {
 		raw:      raw,
 		headings: headings,
 		keywords: keywords,
+		meta:     meta,
 	}, nil
 }
 

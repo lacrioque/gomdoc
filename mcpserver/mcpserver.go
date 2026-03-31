@@ -266,17 +266,7 @@ func (s *Server) handleReadDocument(_ context.Context, _ *mcp.CallToolRequest, a
 
 	frontmatter, body := renderer.ParseFrontmatter(content)
 
-	var header string
-	if frontmatter.Title != "" || frontmatter.Author != "" {
-		header = "---\n"
-		if frontmatter.Title != "" {
-			header += fmt.Sprintf("title: %s\n", frontmatter.Title)
-		}
-		if frontmatter.Author != "" {
-			header += fmt.Sprintf("author: %s\n", frontmatter.Author)
-		}
-		header += "---\n\n"
-	}
+	header := buildFrontmatterHeader(frontmatter)
 
 	return textResult(header + string(body)), nil, nil
 }
@@ -299,7 +289,8 @@ func (s *Server) handleSearchDocuments(_ context.Context, _ *mcp.CallToolRequest
 
 	var lines []string
 	for _, r := range results {
-		lines = append(lines, fmt.Sprintf("## %s (score: %.1f)\nPath: %s\n> %s\n", r.Title, r.Score, r.Path, r.Snippet))
+		metaStr := formatMetadata(r.Meta)
+		lines = append(lines, fmt.Sprintf("## %s (score: %.1f)%s\nPath: %s\n> %s\n", r.Title, r.Score, metaStr, r.Path, r.Snippet))
 	}
 
 	return textResult(strings.Join(lines, "\n")), nil, nil
@@ -375,6 +366,61 @@ func (s *Server) handleReadSection(_ context.Context, _ *mcp.CallToolRequest, ar
 
 	header := fmt.Sprintf("%s %s\n\n", strings.Repeat("#", section.Level), section.Heading)
 	return textResult(header + section.Content), nil, nil
+}
+
+// buildFrontmatterHeader reconstructs a YAML frontmatter block from parsed fields.
+func buildFrontmatterHeader(fm renderer.Frontmatter) string {
+	var fields []string
+	if fm.Title != "" {
+		fields = append(fields, fmt.Sprintf("title: %s", fm.Title))
+	}
+	if fm.Author != "" {
+		fields = append(fields, fmt.Sprintf("author: %s", fm.Author))
+	}
+	if fm.Status != "" {
+		fields = append(fields, fmt.Sprintf("status: %s", fm.Status))
+	}
+	if fm.Date != "" {
+		fields = append(fields, fmt.Sprintf("date: %s", fm.Date))
+	}
+	if fm.Category != "" {
+		fields = append(fields, fmt.Sprintf("category: %s", fm.Category))
+	}
+	if fm.Version != "" {
+		fields = append(fields, fmt.Sprintf("version: %s", fm.Version))
+	}
+	if len(fm.Tags) > 0 {
+		fields = append(fields, fmt.Sprintf("tags: [%s]", strings.Join(fm.Tags, ", ")))
+	}
+	if len(fm.Reviewers) > 0 {
+		fields = append(fields, fmt.Sprintf("reviewers: [%s]", strings.Join(fm.Reviewers, ", ")))
+	}
+
+	if len(fields) == 0 {
+		return ""
+	}
+	return "---\n" + strings.Join(fields, "\n") + "\n---\n\n"
+}
+
+// formatMetadata formats search metadata as a compact inline string for MCP results.
+func formatMetadata(meta search.Metadata) string {
+	var parts []string
+	if meta.Status != "" {
+		parts = append(parts, fmt.Sprintf("status:%s", meta.Status))
+	}
+	if meta.Category != "" {
+		parts = append(parts, fmt.Sprintf("category:%s", meta.Category))
+	}
+	if meta.Version != "" {
+		parts = append(parts, fmt.Sprintf("v%s", meta.Version))
+	}
+	if len(meta.Tags) > 0 {
+		parts = append(parts, fmt.Sprintf("tags:[%s]", strings.Join(meta.Tags, ",")))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " | " + strings.Join(parts, " | ")
 }
 
 // textResult creates a simple text content result.

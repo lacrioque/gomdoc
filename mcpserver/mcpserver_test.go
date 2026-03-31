@@ -19,7 +19,7 @@ func setupTestDir(t *testing.T) string {
 
 	files := map[string]string{
 		"hello.md":      "# Hello World\nThis is a test document about greetings.\n\n## Introduction\nWelcome to the greeting guide.\n\n## Usage\nUse greetings in daily life.",
-		"guide.md":      "---\ntitle: User Guide\nauthor: Test Author\n---\n# Getting Started\nFollow these steps to begin.\n\n## Installation\nRun the installer command.\n\n## Configuration\nEdit the config file.",
+		"guide.md":      "---\ntitle: User Guide\nauthor: Test Author\nstatus: approved\ndate: 2026-01-15\ntags: setup, installation\ncategory: guides\nversion: 1.0.0\nreviewers: Alice, Bob\n---\n# Getting Started\nFollow these steps to begin.\n\n## Installation\nRun the installer command.\n\n## Configuration\nEdit the config file.",
 		"sub/nested.md": "# Nested File\nThis file lives in a subdirectory.\n\n## Details\nMore details about nesting.",
 	}
 
@@ -90,6 +90,15 @@ func TestHandleReadDocument(t *testing.T) {
 	text := result.Content[0].(*mcp.TextContent).Text
 	if !strings.Contains(text, "title: User Guide") {
 		t.Errorf("expected frontmatter title in output, got: %s", text)
+	}
+	if !strings.Contains(text, "status: approved") {
+		t.Errorf("expected frontmatter status in output, got: %s", text)
+	}
+	if !strings.Contains(text, "tags: [setup, installation]") {
+		t.Errorf("expected frontmatter tags in output, got: %s", text)
+	}
+	if !strings.Contains(text, "version: 1.0.0") {
+		t.Errorf("expected frontmatter version in output, got: %s", text)
 	}
 	if !strings.Contains(text, "Getting Started") {
 		t.Errorf("expected body content in output, got: %s", text)
@@ -256,6 +265,24 @@ func TestHandleHelp(t *testing.T) {
 	}
 	if !strings.Contains(text, "mcpServers") {
 		t.Errorf("expected MCP config example in help text")
+	}
+}
+
+func TestHandleSearchDocumentsIncludesMetadata(t *testing.T) {
+	s := newTestServer(t)
+	ctx := context.Background()
+
+	result, _, err := s.handleSearchDocuments(ctx, nil, searchArgs{Query: "installation"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := result.Content[0].(*mcp.TextContent).Text
+	if !strings.Contains(text, "status:approved") {
+		t.Errorf("expected metadata status in search results, got: %s", text)
+	}
+	if !strings.Contains(text, "category:guides") {
+		t.Errorf("expected metadata category in search results, got: %s", text)
 	}
 }
 
