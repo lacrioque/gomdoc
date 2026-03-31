@@ -385,7 +385,7 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     line-height: 1.6;
     color: var(--color-text);
-    max-width: 900px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
     background-color: var(--color-bg);
@@ -1084,6 +1084,91 @@ body.has-sidebar {
     }
 }
 
+/* Page layout with TOC sidebar */
+.page-layout {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+.page-layout .content {
+    flex: 1;
+    min-width: 0;
+}
+
+.toc-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+}
+
+.toc-nav {
+    padding: 16px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border-left: 3px solid #0066cc;
+}
+
+.toc-title {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.toc-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.toc-item {
+    margin: 0;
+}
+
+.toc-item a {
+    display: block;
+    padding: 4px 8px;
+    color: #555;
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1.4;
+    border-radius: 3px;
+    transition: color 0.2s, background-color 0.2s;
+}
+
+.toc-item a:hover {
+    color: #0066cc;
+    background-color: #f5f8ff;
+}
+
+.toc-item a.toc-active {
+    color: #0066cc;
+    font-weight: 600;
+    background-color: #e8f0fe;
+}
+
+.toc-h2 a {
+    padding-left: 16px;
+}
+
+.toc-h3 a {
+    padding-left: 28px;
+    font-size: 12px;
+}
+
+@media (max-width: 900px) {
+    .toc-sidebar {
+        display: none;
+    }
+}
+
 /* Print header (hidden on screen) */
 .print-header {
     display: none;
@@ -1105,7 +1190,7 @@ body.has-sidebar {
         padding: 12mm 16mm 24mm 12mm;
     }
 
-    .nav-buttons, .search-box, .sidebar, .breadcrumbs, .prev-next-nav, .back-to-top {
+    .nav-buttons, .search-box, .sidebar, .breadcrumbs, .prev-next-nav, .back-to-top, .toc-sidebar {
         display: none !important;
     }
 

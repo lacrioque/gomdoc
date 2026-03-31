@@ -242,6 +242,60 @@ const searchJS = `
 })();
 `
 
+const tocJS = `
+(function() {
+    var sidebar = document.getElementById('toc-sidebar');
+    var tocList = document.getElementById('toc-list');
+    var headings = document.querySelectorAll('.content h1, .content h2, .content h3');
+
+    if (headings.length < 2) {
+        sidebar.style.display = 'none';
+        return;
+    }
+
+    headings.forEach(function(heading, index) {
+        if (!heading.id) {
+            heading.id = 'heading-' + index;
+        }
+        var li = document.createElement('li');
+        li.className = 'toc-item toc-' + heading.tagName.toLowerCase();
+        var a = document.createElement('a');
+        a.href = '#' + heading.id;
+        a.textContent = heading.textContent;
+        a.addEventListener('click', function(e) {
+            e.preventDefault();
+            heading.scrollIntoView({ behavior: 'smooth' });
+            history.replaceState(null, '', '#' + heading.id);
+        });
+        li.appendChild(a);
+        tocList.appendChild(li);
+    });
+
+    var tocLinks = tocList.querySelectorAll('a');
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (!entry.isIntersecting) {
+                return;
+            }
+            tocLinks.forEach(function(link) {
+                link.classList.remove('toc-active');
+            });
+            var activeLink = tocList.querySelector('a[href="#' + entry.target.id + '"]');
+            if (activeLink) {
+                activeLink.classList.add('toc-active');
+            }
+        });
+    }, {
+        rootMargin: '0px 0px -70% 0px',
+        threshold: 0
+    });
+
+    headings.forEach(function(heading) {
+        observer.observe(heading);
+    });
+})();
+`
+
 const pageTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -278,6 +332,12 @@ const pageTemplate = `<!DOCTYPE html>
                 {{if .NextPath}}<a href="{{.NextPath}}" class="prev-next-btn next-btn">{{.NextTitle}} &rarr;</a>{{end}}
             </nav>
         </div>
+        <aside id="toc-sidebar" class="toc-sidebar">
+            <nav class="toc-nav">
+                <h3 class="toc-title">On this page</h3>
+                <ul id="toc-list" class="toc-list"></ul>
+            </nav>
+        </aside>
     </div>
     <footer class="site-footer">
         Documentation created by gomdoc: <a href="https://github.com/lacrioque/gomdoc/">https://github.com/lacrioque/gomdoc/</a>
@@ -302,7 +362,8 @@ const pageTemplate = `<!DOCTYPE html>
         mermaid.init(undefined, '.mermaid');
     </script>
     <script>` + codeBlockJS + `</script>
-    <script>` + searchJS + `</script>` + backToTopHTML + `
+    <script>` + searchJS + `</script>
+    <script>` + tocJS + `</script>` + backToTopHTML + `
 </body>
 </html>`
 
