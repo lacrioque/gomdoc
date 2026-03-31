@@ -35,6 +35,59 @@ func RenderIndex(w io.Writer, data IndexData) error {
 	return indexTmpl.Execute(w, data)
 }
 
+const themeJS = `
+(function() {
+    function getEffectiveTheme() {
+        var stored = localStorage.getItem('gomdoc-theme');
+        if (stored === 'light' || stored === 'dark') return stored;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+
+    function applyTheme(theme) {
+        if (theme === 'light' || theme === 'dark') {
+            document.documentElement.setAttribute('data-theme', theme);
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        updateToggleLabel();
+    }
+
+    function updateToggleLabel() {
+        var btn = document.getElementById('theme-toggle');
+        if (!btn) return;
+        var effective = getEffectiveTheme();
+        btn.textContent = effective === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+        btn.setAttribute('aria-label', effective === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    }
+
+    // Apply saved preference on load
+    var stored = localStorage.getItem('gomdoc-theme');
+    if (stored) applyTheme(stored);
+
+    // Listen for system preference changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+        if (!localStorage.getItem('gomdoc-theme')) updateToggleLabel();
+    });
+
+    // Expose toggle for the button
+    window.gomdocToggleTheme = function() {
+        var current = getEffectiveTheme();
+        var next = current === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('gomdoc-theme', next);
+        applyTheme(next);
+
+        // Re-initialize Mermaid with the correct theme if available
+        if (typeof mermaid !== 'undefined') {
+            mermaid.initialize({ startOnLoad: false, theme: next === 'dark' ? 'dark' : 'default' });
+            document.querySelectorAll('.mermaid[data-processed]').forEach(function(el) {
+                el.removeAttribute('data-processed');
+            });
+            mermaid.init(undefined, '.mermaid');
+        }
+    };
+})();
+`
+
 const searchJS = `
 (function() {
     var input = document.getElementById('search-input');
@@ -111,6 +164,7 @@ const pageTemplate = `<!DOCTYPE html>
         </div>
         <span class="current-path">{{.Path}}</span>
         <button onclick="window.print()" class="nav-btn print-btn">Print</button>
+        <button id="theme-toggle" class="theme-toggle" onclick="gomdocToggleTheme()" aria-label="Toggle dark mode">🌙</button>
     </nav>
     <main class="content">
         {{.Content}}
@@ -118,9 +172,15 @@ const pageTemplate = `<!DOCTYPE html>
     <footer class="site-footer">
         Documentation created by gomdoc: <a href="https://github.com/lacrioque/gomdoc/">https://github.com/lacrioque/gomdoc/</a>
     </footer>
+    <script>` + themeJS + `</script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script>
-        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+        (function() {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+                (!document.documentElement.getAttribute('data-theme') &&
+                 window.matchMedia('(prefers-color-scheme: dark)').matches);
+            mermaid.initialize({ startOnLoad: true, theme: isDark ? 'dark' : 'default' });
+        })();
         // Find all code blocks with class "language-mermaid" and convert them
         document.querySelectorAll('pre > code.language-mermaid').forEach(function(codeBlock) {
             var pre = codeBlock.parentElement;
@@ -195,6 +255,7 @@ const indexTemplate = `<!DOCTYPE html>
             <input type="text" id="search-input" placeholder="Search..." autocomplete="off">
             <div id="search-results" class="search-results"></div>
         </div>
+        <button id="theme-toggle" class="theme-toggle" onclick="gomdocToggleTheme()" aria-label="Toggle dark mode">🌙</button>
     </nav>
     <main class="content index-content">
         <h1>File Index</h1>
@@ -203,6 +264,7 @@ const indexTemplate = `<!DOCTYPE html>
     <footer class="site-footer">
         Documentation created by gomdoc: <a href="https://github.com/lacrioque/gomdoc/">https://github.com/lacrioque/gomdoc/</a>
     </footer>
+    <script>` + themeJS + `</script>
     <script>` + searchJS + `</script>
     <script>` + folderToggleJS + `</script>
 </body>

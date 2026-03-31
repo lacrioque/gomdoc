@@ -216,7 +216,100 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 // styleCSS is the embedded CSS for styling the pages.
-const styleCSS = `/* Base styles */
+const styleCSS = `/* Theme custom properties */
+:root {
+    --color-bg: #fafafa;
+    --color-text: #333;
+    --color-text-muted: #555;
+    --color-text-faint: #888;
+    --color-text-quote: #666;
+    --color-heading: #222;
+    --color-link: #0066cc;
+    --color-border: #e0e0e0;
+    --color-border-light: #eee;
+    --color-border-input: #ccc;
+    --color-surface: #fff;
+    --color-surface-alt: #f5f5f5;
+    --color-surface-hover: #f0f0f0;
+    --color-surface-code: #f5f5f5;
+    --color-pre-bg: #282c34;
+    --color-pre-text: #abb2bf;
+    --color-blockquote-bg: #f9f9f9;
+    --color-blockquote-border: #ddd;
+    --color-table-border: #ddd;
+    --color-table-header-bg: #f5f5f5;
+    --color-table-stripe: #fafafa;
+    --color-search-hover: #f5f8ff;
+    --color-search-result-border: #f0f0f0;
+    --color-shadow: rgba(0,0,0,0.1);
+    --color-shadow-strong: rgba(0,0,0,0.15);
+    --color-focus-ring: rgba(0,102,204,0.2);
+    --color-mermaid-bg: #fff;
+}
+
+[data-theme="dark"] {
+    --color-bg: #1a1a2e;
+    --color-text: #e0e0e0;
+    --color-text-muted: #b0b0b0;
+    --color-text-faint: #808080;
+    --color-text-quote: #aaa;
+    --color-heading: #f0f0f0;
+    --color-link: #6cb4ee;
+    --color-border: #333;
+    --color-border-light: #2a2a3e;
+    --color-border-input: #444;
+    --color-surface: #16213e;
+    --color-surface-alt: #1a1a2e;
+    --color-surface-hover: #1f2b47;
+    --color-surface-code: #1e2a3a;
+    --color-pre-bg: #0f1923;
+    --color-pre-text: #abb2bf;
+    --color-blockquote-bg: #1e2a3a;
+    --color-blockquote-border: #444;
+    --color-table-border: #333;
+    --color-table-header-bg: #1e2a3a;
+    --color-table-stripe: #1a2236;
+    --color-search-hover: #1e2a3a;
+    --color-search-result-border: #2a2a3e;
+    --color-shadow: rgba(0,0,0,0.3);
+    --color-shadow-strong: rgba(0,0,0,0.4);
+    --color-focus-ring: rgba(108,180,238,0.3);
+    --color-mermaid-bg: #16213e;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --color-bg: #1a1a2e;
+        --color-text: #e0e0e0;
+        --color-text-muted: #b0b0b0;
+        --color-text-faint: #808080;
+        --color-text-quote: #aaa;
+        --color-heading: #f0f0f0;
+        --color-link: #6cb4ee;
+        --color-border: #333;
+        --color-border-light: #2a2a3e;
+        --color-border-input: #444;
+        --color-surface: #16213e;
+        --color-surface-alt: #1a1a2e;
+        --color-surface-hover: #1f2b47;
+        --color-surface-code: #1e2a3a;
+        --color-pre-bg: #0f1923;
+        --color-pre-text: #abb2bf;
+        --color-blockquote-bg: #1e2a3a;
+        --color-blockquote-border: #444;
+        --color-table-border: #333;
+        --color-table-header-bg: #1e2a3a;
+        --color-table-stripe: #1a2236;
+        --color-search-hover: #1e2a3a;
+        --color-search-result-border: #2a2a3e;
+        --color-shadow: rgba(0,0,0,0.3);
+        --color-shadow-strong: rgba(0,0,0,0.4);
+        --color-focus-ring: rgba(108,180,238,0.3);
+        --color-mermaid-bg: #16213e;
+    }
+}
+
+/* Base styles */
 * {
     box-sizing: border-box;
 }
@@ -224,11 +317,11 @@ const styleCSS = `/* Base styles */
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     line-height: 1.6;
-    color: #333;
+    color: var(--color-text);
     max-width: 900px;
     margin: 0 auto;
     padding: 20px;
-    background-color: #fafafa;
+    background-color: var(--color-bg);
 }
 
 /* Navigation */
@@ -238,13 +331,14 @@ body {
     gap: 10px;
     padding: 10px 0;
     margin-bottom: 20px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .nav-btn {
     padding: 8px 16px;
-    border: 1px solid #ccc;
-    background: #fff;
+    border: 1px solid var(--color-border-input);
+    background: var(--color-surface);
+    color: var(--color-text);
     cursor: pointer;
     border-radius: 4px;
     font-size: 14px;
@@ -252,27 +346,44 @@ body {
 }
 
 .nav-btn:hover {
-    background-color: #f0f0f0;
+    background-color: var(--color-surface-hover);
 }
 
 .nav-title {
     font-weight: bold;
     font-size: 18px;
-    color: #555;
+    color: var(--color-text-muted);
 }
 
 .current-path {
-    color: #888;
+    color: var(--color-text-faint);
     font-size: 14px;
     margin-left: auto;
 }
 
+/* Theme toggle */
+.theme-toggle {
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-input);
+    background: var(--color-surface);
+    color: var(--color-text);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1;
+    transition: background-color 0.2s;
+}
+
+.theme-toggle:hover {
+    background-color: var(--color-surface-hover);
+}
+
 /* Content area */
 .content {
-    background: #fff;
+    background: var(--color-surface);
     padding: 30px;
     border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px var(--color-shadow);
 }
 
 /* File tree */
@@ -301,7 +412,7 @@ body {
 
 .file-tree .folder {
     font-weight: bold;
-    color: #555;
+    color: var(--color-text-muted);
     cursor: pointer;
     list-style: none;
 }
@@ -323,7 +434,7 @@ body {
 }
 
 .file-tree a {
-    color: #0066cc;
+    color: var(--color-link);
     text-decoration: none;
 }
 
@@ -335,11 +446,11 @@ body {
 .content h1, .content h2, .content h3, .content h4, .content h5, .content h6 {
     margin-top: 1.5em;
     margin-bottom: 0.5em;
-    color: #222;
+    color: var(--color-heading);
 }
 
-.content h1 { font-size: 2em; border-bottom: 2px solid #eee; padding-bottom: 0.3em; }
-.content h2 { font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
+.content h1 { font-size: 2em; border-bottom: 2px solid var(--color-border-light); padding-bottom: 0.3em; }
+.content h2 { font-size: 1.5em; border-bottom: 1px solid var(--color-border-light); padding-bottom: 0.3em; }
 .content h3 { font-size: 1.25em; }
 
 .content p {
@@ -347,11 +458,11 @@ body {
 }
 
 .content a {
-    color: #0066cc;
+    color: var(--color-link);
 }
 
 .content code {
-    background-color: #f5f5f5;
+    background-color: var(--color-surface-code);
     padding: 2px 6px;
     border-radius: 3px;
     font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
@@ -359,8 +470,8 @@ body {
 }
 
 .content pre {
-    background-color: #282c34;
-    color: #abb2bf;
+    background-color: var(--color-pre-bg);
+    color: var(--color-pre-text);
     padding: 16px;
     border-radius: 6px;
     overflow-x: auto;
@@ -373,11 +484,11 @@ body {
 }
 
 .content blockquote {
-    border-left: 4px solid #ddd;
+    border-left: 4px solid var(--color-blockquote-border);
     margin: 1em 0;
     padding: 0.5em 1em;
-    background-color: #f9f9f9;
-    color: #666;
+    background-color: var(--color-blockquote-bg);
+    color: var(--color-text-quote);
 }
 
 .content table {
@@ -387,18 +498,18 @@ body {
 }
 
 .content th, .content td {
-    border: 1px solid #ddd;
+    border: 1px solid var(--color-table-border);
     padding: 8px 12px;
     text-align: left;
 }
 
 .content th {
-    background-color: #f5f5f5;
+    background-color: var(--color-table-header-bg);
     font-weight: bold;
 }
 
 .content tr:nth-child(even) {
-    background-color: #fafafa;
+    background-color: var(--color-table-stripe);
 }
 
 .content img {
@@ -417,7 +528,7 @@ body {
 
 /* Mermaid diagrams */
 .mermaid {
-    background: #fff;
+    background: var(--color-mermaid-bg);
     padding: 20px;
     border-radius: 4px;
     text-align: center;
@@ -433,15 +544,17 @@ body {
 .search-box input {
     width: 100%;
     padding: 6px 12px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--color-border-input);
     border-radius: 4px;
     font-size: 14px;
     outline: none;
+    background: var(--color-surface);
+    color: var(--color-text);
 }
 
 .search-box input:focus {
-    border-color: #0066cc;
-    box-shadow: 0 0 0 2px rgba(0,102,204,0.2);
+    border-color: var(--color-link);
+    box-shadow: 0 0 0 2px var(--color-focus-ring);
 }
 
 .search-results {
@@ -450,13 +563,13 @@ body {
     top: 100%;
     left: 0;
     right: 0;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-input);
     border-radius: 4px;
     margin-top: 4px;
     max-height: 400px;
     overflow-y: auto;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px var(--color-shadow-strong);
     z-index: 100;
 }
 
@@ -464,7 +577,7 @@ body {
     display: block;
     padding: 10px 12px;
     text-decoration: none;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--color-search-result-border);
     color: inherit;
 }
 
@@ -473,25 +586,25 @@ body {
 }
 
 .search-result:hover {
-    background-color: #f5f8ff;
+    background-color: var(--color-search-hover);
 }
 
 .search-result-title {
     font-weight: 600;
-    color: #0066cc;
+    color: var(--color-link);
     font-size: 14px;
 }
 
 .search-result-snippet {
     font-size: 12px;
-    color: #666;
+    color: var(--color-text-quote);
     margin-top: 2px;
     line-height: 1.4;
 }
 
 .search-no-results {
     padding: 12px;
-    color: #888;
+    color: var(--color-text-faint);
     font-size: 14px;
     text-align: center;
 }
@@ -505,14 +618,14 @@ body {
 .site-footer {
     margin-top: 40px;
     padding: 20px 0;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--color-border);
     text-align: center;
     font-size: 14px;
-    color: #888;
+    color: var(--color-text-faint);
 }
 
 .site-footer a {
-    color: #0066cc;
+    color: var(--color-link);
     text-decoration: none;
 }
 
@@ -640,16 +753,17 @@ body {
 
     html, body {
         background: white;
+        color: #333;
         max-width: 100%;
         margin: 0;
         }
-        
+
     @page {
         size: A4;
         margin: 0;
         padding: 12mm 16mm 24mm 12mm;
     }
-        
+
     .nav-buttons, .search-box {
         display: none !important;
     }
@@ -692,13 +806,13 @@ body {
         color: #000 !important;
         text-decoration: underline;
     }
-    
+
     /* Prevent page breaks inside elements and break before h1*/
 
     .content h1:not(:first-of-type) {
         page-break-before: always;
     }
-    
+
     .content h1, .content h2, .content h3,
     .content h4, .content h5, .content h6 {
         page-break-after: avoid;
