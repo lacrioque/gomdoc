@@ -3,6 +3,7 @@ package renderer
 
 import (
 	"bytes"
+	"fmt"
 	"path"
 	"regexp"
 	"strings"
@@ -135,12 +136,66 @@ func (r *Renderer) Render(content []byte) ([]byte, error) {
 // The currentDir parameter is the directory of the current file being rendered
 // (relative to the base), used for resolving relative links.
 func (r *Renderer) RenderWithLinks(content []byte, currentDir string) ([]byte, error) {
-	html, err := r.Render(content)
+	htmlOut, err := r.Render(content)
 	if err != nil {
 		return nil, err
 	}
 
-	return RewriteLinks(html, currentDir), nil
+	htmlOut = RewriteLinks(htmlOut, currentDir)
+	htmlOut = TransformAdmonitions(htmlOut)
+
+	return htmlOut, nil
+}
+
+// admonitionTypes maps GitHub-style alert markers to their display titles.
+var admonitionTypes = map[string]string{
+	"NOTE":      "Note",
+	"TIP":       "Tip",
+	"IMPORTANT": "Important",
+	"WARNING":   "Warning",
+	"CAUTION":   "Caution",
+	"DANGER":    "Danger",
+}
+
+// admonitionPattern matches blockquotes containing GitHub-style alert markers.
+// It captures the alert type from patterns like: <blockquote>\n<p>[!NOTE]<br> or <blockquote>\n<p>[!NOTE]</p>
+var admonitionPattern = regexp.MustCompile(
+	`(?s)<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION|DANGER)\](<br>\n?|\s*</p>)`,
+)
+
+// TransformAdmonitions converts GitHub-style alert blockquotes into styled admonition blocks.
+// Input like `> [!NOTE]\n> text` (rendered by goldmark as a blockquote) becomes a
+// blockquote with admonition classes and a title paragraph.
+func TransformAdmonitions(htmlContent []byte) []byte {
+	return admonitionPattern.ReplaceAllFunc(htmlContent, func(match []byte) []byte {
+		sub := admonitionPattern.FindSubmatch(match)
+		if len(sub) < 3 {
+			return match
+		}
+
+		alertType := string(sub[1])
+		title, ok := admonitionTypes[alertType]
+		if !ok {
+			return match
+		}
+
+		suffix := string(sub[2])
+		class := strings.ToLower(alertType)
+
+		// If the marker was followed by <br>, the remaining text continues in the same <p>.
+		// Replace the marker+br with a title paragraph and reopen <p> for the rest.
+		if strings.HasPrefix(suffix, "<br>") {
+			return []byte(fmt.Sprintf(
+				`<blockquote class="admonition admonition-%s">`+"\n"+
+					`<p class="admonition-title">%s</p>`+"\n"+
+					`<p>`, class, title))
+		}
+
+		// The marker was the only content in its <p> tag — replace it with a title.
+		return []byte(fmt.Sprintf(
+			`<blockquote class="admonition admonition-%s">`+"\n"+
+				`<p class="admonition-title">%s</p>`, class, title))
+	})
 }
 
 // linkPattern matches markdown-style links in HTML: href="something.md" or href="./path/to/file.md"

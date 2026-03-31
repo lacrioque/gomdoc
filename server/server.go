@@ -491,6 +491,60 @@ body {
     color: var(--color-text-quote);
 }
 
+/* Admonition/callout blocks (GitHub-style alerts) */
+.content .admonition {
+    border-radius: 6px;
+    padding: 12px 16px;
+    color: #333;
+}
+
+.content .admonition .admonition-title {
+    font-weight: 700;
+    margin: 0 0 0.4em 0;
+}
+
+.content .admonition-note {
+    border-left-color: #0969da;
+    background-color: #ddf4ff;
+}
+
+.content .admonition-note .admonition-title { color: #0969da; }
+
+.content .admonition-tip {
+    border-left-color: #1a7f37;
+    background-color: #dafbe1;
+}
+
+.content .admonition-tip .admonition-title { color: #1a7f37; }
+
+.content .admonition-important {
+    border-left-color: #8250df;
+    background-color: #fbefff;
+}
+
+.content .admonition-important .admonition-title { color: #8250df; }
+
+.content .admonition-warning {
+    border-left-color: #9a6700;
+    background-color: #fff8c5;
+}
+
+.content .admonition-warning .admonition-title { color: #9a6700; }
+
+.content .admonition-caution {
+    border-left-color: #cf222e;
+    background-color: #ffebe9;
+}
+
+.content .admonition-caution .admonition-title { color: #cf222e; }
+
+.content .admonition-danger {
+    border-left-color: #cf222e;
+    background-color: #ffebe9;
+}
+
+.content .admonition-danger .admonition-title { color: #cf222e; }
+
 .content table {
     border-collapse: collapse;
     width: 100%;
