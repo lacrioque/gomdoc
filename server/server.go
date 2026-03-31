@@ -143,7 +143,7 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request) {
 		filePath = filepath.Join(s.baseDir, urlPath+".MD")
 		content, err = os.ReadFile(filePath)
 		if err != nil {
-			http.Error(w, "File not found", http.StatusNotFound)
+			s.handleNotFound(w, r)
 			return
 		}
 	}
@@ -236,6 +236,19 @@ func buildBreadcrumbs(urlPath string) template.HTML {
 	}
 	sb.WriteString(`</nav>`)
 	return template.HTML(sb.String())
+}
+
+// handleNotFound renders a custom 404 page with navigation and search.
+func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
+	data := templates.NotFoundData{
+		SiteTitle:   s.title,
+		RequestPath: r.URL.Path,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	if err := templates.RenderNotFound(w, data); err != nil {
+		log.Printf("Error rendering 404 page: %v", err)
+	}
 }
 
 // handleStatic serves embedded static files.
@@ -912,6 +925,55 @@ body.has-sidebar {
     text-decoration: underline;
 }
 
+/* Back to top button */
+.back-to-top {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 44px;
+    height: 44px;
+    border: 1px solid #ccc;
+    background: #fff;
+    color: #555;
+    font-size: 22px;
+    line-height: 1;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+    z-index: 200;
+}
+
+.back-to-top.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.back-to-top:hover {
+    background-color: #0066cc;
+    color: #fff;
+    border-color: #0066cc;
+}
+
+/* 404 page */
+.not-found-content {
+    text-align: center;
+    padding: 60px 30px;
+}
+
+.not-found-content h1 {
+    font-size: 2.5em;
+    color: #999;
+    border-bottom: none;
+    margin-top: 0;
+}
+
+.not-found-content code {
+    font-size: 1.1em;
+}
+
 /* Responsive: Tablet (768px) */
 @media (max-width: 768px) {
     body {
@@ -1043,7 +1105,7 @@ body.has-sidebar {
         padding: 12mm 16mm 24mm 12mm;
     }
 
-    .nav-buttons, .search-box, .sidebar, .breadcrumbs, .prev-next-nav {
+    .nav-buttons, .search-box, .sidebar, .breadcrumbs, .prev-next-nav, .back-to-top {
         display: none !important;
     }
 

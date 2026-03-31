@@ -28,8 +28,15 @@ type IndexData struct {
 	TreeHTML  template.HTML
 }
 
+// NotFoundData holds data for the custom 404 page.
+type NotFoundData struct {
+	SiteTitle   string
+	RequestPath string
+}
+
 var pageTmpl = template.Must(template.New("page").Parse(pageTemplate))
 var indexTmpl = template.Must(template.New("index").Parse(indexTemplate))
+var notFoundTmpl = template.Must(template.New("notfound").Parse(notFoundTemplate))
 
 // RenderPage renders a markdown page with navigation.
 func RenderPage(w io.Writer, data PageData) error {
@@ -40,6 +47,43 @@ func RenderPage(w io.Writer, data PageData) error {
 func RenderIndex(w io.Writer, data IndexData) error {
 	return indexTmpl.Execute(w, data)
 }
+
+// RenderNotFound renders the custom 404 page.
+func RenderNotFound(w io.Writer, data NotFoundData) error {
+	return notFoundTmpl.Execute(w, data)
+}
+
+// faviconLink is the favicon as an embedded SVG data URI.
+const faviconLink = `<link rel="icon" href="data:image/svg+xml,` +
+	`%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E` +
+	`%3Crect x='15' y='10' width='55' height='75' rx='3' fill='%230066cc'/%3E` +
+	`%3Crect x='20' y='15' width='45' height='65' rx='2' fill='%23fff'/%3E` +
+	`%3Crect x='30' y='25' width='25' height='3' rx='1' fill='%230066cc'/%3E` +
+	`%3Crect x='30' y='33' width='25' height='2' rx='1' fill='%23ccc'/%3E` +
+	`%3Crect x='30' y='39' width='20' height='2' rx='1' fill='%23ccc'/%3E` +
+	`%3Crect x='30' y='45' width='25' height='2' rx='1' fill='%23ccc'/%3E` +
+	`%3Crect x='30' y='51' width='18' height='2' rx='1' fill='%23ccc'/%3E` +
+	`%3Crect x='30' y='57' width='25' height='2' rx='1' fill='%23ccc'/%3E` +
+	`%3C/svg%3E">`
+
+// backToTopHTML is the back-to-top button markup and behavior.
+const backToTopHTML = `
+    <button id="back-to-top" class="back-to-top" aria-label="Back to top" title="Back to top">&#8679;</button>
+    <script>
+    (function() {
+        var btn = document.getElementById('back-to-top');
+        window.addEventListener('scroll', function() {
+            if (window.scrollY > 300) {
+                btn.classList.add('visible');
+            } else {
+                btn.classList.remove('visible');
+            }
+        });
+        btn.addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    })();
+    </script>`
 
 const themeJS = `
 (function() {
@@ -204,6 +248,7 @@ const pageTemplate = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - {{.SiteTitle}}</title>
+    ` + faviconLink + `
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="has-sidebar">
@@ -257,7 +302,7 @@ const pageTemplate = `<!DOCTYPE html>
         mermaid.init(undefined, '.mermaid');
     </script>
     <script>` + codeBlockJS + `</script>
-    <script>` + searchJS + `</script>
+    <script>` + searchJS + `</script>` + backToTopHTML + `
 </body>
 </html>`
 
@@ -312,6 +357,7 @@ const indexTemplate = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Index - {{.SiteTitle}}</title>
+    ` + faviconLink + `
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -332,6 +378,36 @@ const indexTemplate = `<!DOCTYPE html>
     </footer>
     <script>` + themeJS + `</script>
     <script>` + searchJS + `</script>
-    <script>` + folderToggleJS + `</script>
+    <script>` + folderToggleJS + `</script>` + backToTopHTML + `
+</body>
+</html>`
+
+const notFoundTemplate = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found - {{.SiteTitle}}</title>
+    ` + faviconLink + `
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="nav-buttons">
+        <button onclick="history.back()" class="nav-btn">Back</button>
+        <a href="/"><button class="nav-btn">Home</button></a>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search..." autocomplete="off">
+            <div id="search-results" class="search-results"></div>
+        </div>
+    </nav>
+    <main class="content not-found-content">
+        <h1>404 - Page Not Found</h1>
+        <p>The page <code>{{.RequestPath}}</code> could not be found.</p>
+        <p>Try searching for what you need, or go back to the <a href="/">home page</a>.</p>
+    </main>
+    <footer class="site-footer">
+        Documentation created by gomdoc: <a href="https://github.com/lacrioque/gomdoc/">https://github.com/lacrioque/gomdoc/</a>
+    </footer>
+    <script>` + searchJS + `</script>
 </body>
 </html>`
