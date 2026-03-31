@@ -289,10 +289,11 @@ func (s *Server) handleSearchDocuments(_ context.Context, _ *mcp.CallToolRequest
 
 	var lines []string
 	for _, r := range results {
+		metaStr := formatMetadata(r.Meta)
 		if r.Score > 0 {
-			lines = append(lines, fmt.Sprintf("## %s (score: %.1f)\nPath: %s\n> %s\n", r.Title, r.Score, r.Path, r.Snippet))
+			lines = append(lines, fmt.Sprintf("## %s (score: %.1f)%s\nPath: %s\n> %s\n", r.Title, r.Score, metaStr, r.Path, r.Snippet))
 		} else {
-			lines = append(lines, fmt.Sprintf("## %s\nPath: %s\n", r.Title, r.Path))
+			lines = append(lines, fmt.Sprintf("## %s%s\nPath: %s\n", r.Title, metaStr, r.Path))
 		}
 	}
 

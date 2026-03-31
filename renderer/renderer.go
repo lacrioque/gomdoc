@@ -66,24 +66,65 @@ func ParseFrontmatter(content []byte) (Frontmatter, []byte) {
 
 	// Parse key-value pairs
 	lines := strings.Split(fmBlock, "\n")
+	var currentListKey string
 	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			currentListKey = ""
 			continue
 		}
 
-		parts := strings.SplitN(line, ":", 2)
+		// Handle YAML list items (e.g., "  - value")
+		if strings.HasPrefix(trimmed, "- ") && currentListKey != "" {
+			item := strings.TrimSpace(strings.TrimPrefix(trimmed, "-"))
+			item = strings.Trim(item, "\"'")
+			switch currentListKey {
+			case "tags":
+				fm.Tags = append(fm.Tags, item)
+			case "reviewers":
+				fm.Reviewers = append(fm.Reviewers, item)
+			}
+			continue
+		}
+
+		parts := strings.SplitN(trimmed, ":", 2)
 		if len(parts) != 2 {
+			currentListKey = ""
 			continue
 		}
 
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
+		lowerKey := strings.ToLower(key)
 
 		// Remove surrounding quotes if present
 		value = strings.Trim(value, "\"'")
 
-		switch strings.ToLower(key) {
+		// Check for inline list syntax: [item1, item2]
+		if strings.HasPrefix(value, "[") && strings.HasSuffix(value, "]") {
+			items := parseList(value)
+			switch lowerKey {
+			case "tags":
+				fm.Tags = items
+			case "reviewers":
+				fm.Reviewers = items
+			}
+			currentListKey = ""
+			continue
+		}
+
+		// If value is empty, the next lines may be YAML list items
+		if value == "" {
+			if lowerKey == "tags" || lowerKey == "reviewers" {
+				currentListKey = lowerKey
+			}
+			continue
+		}
+
+		currentListKey = ""
+
+		// Comma-separated values for list fields
+		switch lowerKey {
 		case "title":
 			fm.Title = value
 		case "author":

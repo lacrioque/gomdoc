@@ -214,3 +214,27 @@ Some content.
 		t.Errorf("expected no tags, got %v", fm.Tags)
 	}
 }
+
+func TestParseFrontmatterNoFrontmatter(t *testing.T) {
+	content := []byte("# Hello\nNo frontmatter here.\n")
+	fm, body := ParseFrontmatter(content)
+
+	if fm.Title != "" {
+		t.Errorf("expected empty title, got '%s'", fm.Title)
+	}
+	if string(body) != string(content) {
+		t.Errorf("expected body to equal original content")
+	}
+}
+
+func TestParseFrontmatterQuotedValues(t *testing.T) {
+	content := []byte("---\ntitle: \"Quoted Title\"\nstatus: 'draft'\n---\nBody\n")
+	fm, _ := ParseFrontmatter(content)
+
+	if fm.Title != "Quoted Title" {
+		t.Errorf("expected title 'Quoted Title', got '%s'", fm.Title)
+	}
+	if fm.Status != "draft" {
+		t.Errorf("expected status 'draft', got '%s'", fm.Status)
+	}
+}

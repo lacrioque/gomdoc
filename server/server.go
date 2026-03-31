@@ -201,6 +201,12 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request) {
 		Title:       title,
 		SiteTitle:   s.title,
 		Author:      frontmatter.Author,
+		Status:      frontmatter.Status,
+		Date:        frontmatter.Date,
+		Tags:        frontmatter.Tags,
+		Category:    frontmatter.Category,
+		Version:     frontmatter.Version,
+		Reviewers:   frontmatter.Reviewers,
 		Content:     template.HTML(html),
 		Path:        r.URL.Path,
 		Breadcrumbs: breadcrumbs,
@@ -716,6 +722,41 @@ body.has-sidebar {
     border-radius: 4px;
     text-align: center;
 }
+
+/* Document metadata header */
+.doc-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    font-size: 13px;
+    align-items: center;
+}
+
+.meta-item {
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: #e9ecef;
+    color: #495057;
+    white-space: nowrap;
+}
+
+.meta-status { font-weight: 600; text-transform: capitalize; }
+.meta-status-draft { background: #fff3cd; color: #856404; }
+.meta-status-review { background: #cce5ff; color: #004085; }
+.meta-status-approved { background: #d4edda; color: #155724; }
+.meta-status-deprecated { background: #f8d7da; color: #721c24; }
+.meta-status-stable { background: #d4edda; color: #155724; }
+
+.meta-category { background: #e2e3f1; color: #383d6e; }
+.meta-version { background: #d1ecf1; color: #0c5460; font-family: monospace; }
+.meta-date { color: #6c757d; background: transparent; padding-left: 0; }
+.meta-tags { background: transparent; color: #6c757d; font-style: italic; }
+.meta-reviewers { background: transparent; color: #6c757d; margin-left: auto; }
 
 /* Search */
 .search-box {

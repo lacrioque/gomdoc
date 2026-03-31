@@ -17,6 +17,24 @@ import (
 	"gomdoc/scanner"
 )
 
+// Metadata holds extended frontmatter fields for search results and outlines.
+type Metadata struct {
+	// Author is the document author.
+	Author string `json:"author,omitempty"`
+	// Status is the document lifecycle status (draft, review, approved, deprecated).
+	Status string `json:"status,omitempty"`
+	// Date is the document date.
+	Date string `json:"date,omitempty"`
+	// Tags is a list of classification tags.
+	Tags []string `json:"tags,omitempty"`
+	// Category is the document category.
+	Category string `json:"category,omitempty"`
+	// Version is the document version.
+	Version string `json:"version,omitempty"`
+	// Reviewers is a list of document reviewers.
+	Reviewers []string `json:"reviewers,omitempty"`
+}
+
 // Result represents a single search match.
 type Result struct {
 	// Title is the document title (from frontmatter or filename).
@@ -27,6 +45,8 @@ type Result struct {
 	Snippet string `json:"snippet"`
 	// Score indicates relevance (higher is better). Only set by keyword search.
 	Score float64 `json:"score,omitempty"`
+	// Meta holds extended frontmatter metadata.
+	Meta Metadata `json:"meta,omitempty"`
 }
 
 // Heading represents a parsed markdown heading within a document.
@@ -39,23 +59,6 @@ type Heading struct {
 	Line int `json:"line"`
 }
 
-// Metadata holds frontmatter fields for a document.
-type Metadata struct {
-	// Author is the document author.
-	Author string `json:"author,omitempty"`
-	// Status is the document status (e.g. draft, published, deprecated).
-	Status string `json:"status,omitempty"`
-	// Date is the document date.
-	Date string `json:"date,omitempty"`
-	// Tags are the document tags for filtering.
-	Tags []string `json:"tags,omitempty"`
-	// Category is the document category.
-	Category string `json:"category,omitempty"`
-	// Version is the document version.
-	Version string `json:"version,omitempty"`
-	// Reviewers lists the document reviewers.
-	Reviewers []string `json:"reviewers,omitempty"`
-}
 
 // DocumentOutline describes a document's structure via its headings.
 type DocumentOutline struct {
@@ -202,6 +205,7 @@ func (idx *Index) SearchKeywords(query string, maxResults int) []Result {
 			Path:    m.doc.path,
 			Snippet: extractSnippet(m.doc.raw, m.pos, queryLen),
 			Score:   m.score,
+			Meta:    m.doc.meta,
 		}
 	}
 
@@ -393,6 +397,14 @@ func indexFile(baseDir string, entry scanner.FileEntry) (document, error) {
 	raw := string(body)
 	headings := parseHeadings(raw)
 	keywords := buildKeywordMap(raw)
+
+	// Index frontmatter fields as keywords for searchability
+	metaText := strings.Join(frontmatter.Tags, " ") + " " +
+		frontmatter.Category + " " + frontmatter.Status + " " +
+		strings.Join(frontmatter.Reviewers, " ")
+	for k, v := range buildKeywordMap(metaText) {
+		keywords[k] += v
+	}
 
 	meta := Metadata{
 		Author:    frontmatter.Author,
