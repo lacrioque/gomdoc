@@ -16,8 +16,14 @@ import (
 
 // Frontmatter holds metadata parsed from YAML frontmatter.
 type Frontmatter struct {
-	Title  string
-	Author string
+	Title     string
+	Author    string
+	Status    string
+	Date      string
+	Tags      []string
+	Category  string
+	Version   string
+	Reviewers []string
 }
 
 // ParseFrontmatter extracts YAML frontmatter from markdown content.
@@ -81,6 +87,18 @@ func ParseFrontmatter(content []byte) (Frontmatter, []byte) {
 			fm.Title = value
 		case "author":
 			fm.Author = value
+		case "status":
+			fm.Status = value
+		case "date":
+			fm.Date = value
+		case "tags":
+			fm.Tags = parseList(value)
+		case "category":
+			fm.Category = value
+		case "version":
+			fm.Version = value
+		case "reviewers":
+			fm.Reviewers = parseList(value)
 		}
 	}
 
@@ -93,6 +111,24 @@ func ParseFrontmatter(content []byte) (Frontmatter, []byte) {
 	}
 
 	return fm, []byte(remaining)
+}
+
+// parseList splits a comma-separated or YAML inline list value into trimmed items.
+// Supports both "a, b, c" and "[a, b, c]" formats.
+func parseList(value string) []string {
+	value = strings.TrimPrefix(value, "[")
+	value = strings.TrimSuffix(value, "]")
+
+	var items []string
+	for _, item := range strings.Split(value, ",") {
+		item = strings.TrimSpace(item)
+		item = strings.Trim(item, "\"'")
+		if item != "" {
+			items = append(items, item)
+		}
+	}
+
+	return items
 }
 
 // Renderer handles markdown to HTML conversion.

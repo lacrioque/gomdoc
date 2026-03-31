@@ -39,6 +39,24 @@ type Heading struct {
 	Line int `json:"line"`
 }
 
+// Metadata holds frontmatter fields for a document.
+type Metadata struct {
+	// Author is the document author.
+	Author string `json:"author,omitempty"`
+	// Status is the document status (e.g. draft, published, deprecated).
+	Status string `json:"status,omitempty"`
+	// Date is the document date.
+	Date string `json:"date,omitempty"`
+	// Tags are the document tags for filtering.
+	Tags []string `json:"tags,omitempty"`
+	// Category is the document category.
+	Category string `json:"category,omitempty"`
+	// Version is the document version.
+	Version string `json:"version,omitempty"`
+	// Reviewers lists the document reviewers.
+	Reviewers []string `json:"reviewers,omitempty"`
+}
+
 // DocumentOutline describes a document's structure via its headings.
 type DocumentOutline struct {
 	// Title is the document title.
@@ -47,6 +65,8 @@ type DocumentOutline struct {
 	Path string `json:"path"`
 	// Headings is the ordered list of headings in the document.
 	Headings []Heading `json:"headings"`
+	// Meta holds the document's frontmatter metadata.
+	Meta Metadata `json:"meta,omitempty"`
 }
 
 // Section holds the content under a specific heading.
@@ -63,10 +83,11 @@ type Section struct {
 type document struct {
 	title    string
 	path     string
-	content  string    // lowercased plain text for searching
-	raw      string    // original text for snippet extraction
-	headings []Heading // parsed headings with line numbers
+	content  string         // lowercased plain text for searching
+	raw      string         // original text for snippet extraction
+	headings []Heading       // parsed headings with line numbers
 	keywords map[string]int // word frequency map for keyword search
+	meta     Metadata       // frontmatter metadata
 }
 
 // Index holds the in-memory search index.
@@ -198,6 +219,7 @@ func (idx *Index) Outline(docPath string) (DocumentOutline, bool) {
 				Title:    doc.title,
 				Path:     doc.path,
 				Headings: doc.headings,
+				Meta:     doc.meta,
 			}, true
 		}
 	}
@@ -219,6 +241,7 @@ func (idx *Index) AllTopics() []DocumentOutline {
 			Title:    doc.title,
 			Path:     doc.path,
 			Headings: doc.headings,
+			Meta:     doc.meta,
 		})
 	}
 
@@ -241,6 +264,109 @@ func (idx *Index) FindSection(docPath, headingQuery string) (Section, bool) {
 	}
 
 	return Section{}, false
+}
+
+// SearchKeywordsWithTags performs keyword search filtered by tags.
+// Only documents that have at least one of the specified tags are returned.
+// If tags is empty, it behaves identically to SearchKeywords.
+func (idx *Index) SearchKeywordsWithTags(query string, tags []string, maxResults int) []Result {
+	if len(tags) == 0 {
+		return idx.SearchKeywords(query, maxResults)
+	}
+
+	if query == "" {
+		return idx.filterByTags(tags, maxResults)
+	}
+
+	keywords := tokenize(query)
+	if len(keywords) == 0 {
+		return idx.filterByTags(tags, maxResults)
+	}
+
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	type scored struct {
+		doc   document
+		score float64
+		pos   int
+	}
+
+	lowerTags := make([]string, len(tags))
+	for i, t := range tags {
+		lowerTags[i] = strings.ToLower(t)
+	}
+
+	var matches []scored
+	for _, doc := range idx.docs {
+		if !docHasTag(doc, lowerTags) {
+			continue
+		}
+		score, firstPos := scoreDocument(doc, keywords)
+		if score == 0 {
+			continue
+		}
+		matches = append(matches, scored{doc: doc, score: score, pos: firstPos})
+	}
+
+	sort.Slice(matches, func(i, j int) bool {
+		return matches[i].score > matches[j].score
+	})
+
+	limit := min(maxResults, len(matches))
+	results := make([]Result, limit)
+	for i := 0; i < limit; i++ {
+		m := matches[i]
+		queryLen := len(keywords[0])
+		results[i] = Result{
+			Title:   m.doc.title,
+			Path:    m.doc.path,
+			Snippet: extractSnippet(m.doc.raw, m.pos, queryLen),
+			Score:   m.score,
+		}
+	}
+
+	return results
+}
+
+// filterByTags returns documents matching any of the given tags, without keyword scoring.
+func (idx *Index) filterByTags(tags []string, maxResults int) []Result {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	lowerTags := make([]string, len(tags))
+	for i, t := range tags {
+		lowerTags[i] = strings.ToLower(t)
+	}
+
+	var results []Result
+	for _, doc := range idx.docs {
+		if !docHasTag(doc, lowerTags) {
+			continue
+		}
+		results = append(results, Result{
+			Title: doc.title,
+			Path:  doc.path,
+		})
+		if len(results) >= maxResults {
+			break
+		}
+	}
+
+	return results
+}
+
+// docHasTag checks whether a document has at least one of the given lowercase tags.
+func docHasTag(doc document, lowerTags []string) bool {
+	for _, docTag := range doc.meta.Tags {
+		lower := strings.ToLower(docTag)
+		for _, t := range lowerTags {
+			if lower == t {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // headingPattern matches markdown headings (# through ######).
@@ -268,6 +394,16 @@ func indexFile(baseDir string, entry scanner.FileEntry) (document, error) {
 	headings := parseHeadings(raw)
 	keywords := buildKeywordMap(raw)
 
+	meta := Metadata{
+		Author:    frontmatter.Author,
+		Status:    frontmatter.Status,
+		Date:      frontmatter.Date,
+		Tags:      frontmatter.Tags,
+		Category:  frontmatter.Category,
+		Version:   frontmatter.Version,
+		Reviewers: frontmatter.Reviewers,
+	}
+
 	return document{
 		title:    title,
 		path:     urlPath,
@@ -275,6 +411,7 @@ func indexFile(baseDir string, entry scanner.FileEntry) (document, error) {
 		raw:      raw,
 		headings: headings,
 		keywords: keywords,
+		meta:     meta,
 	}, nil
 }
 

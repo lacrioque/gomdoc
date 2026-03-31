@@ -288,6 +288,104 @@ func TestTokenizeSkipsShort(t *testing.T) {
 	}
 }
 
+// setupTestDirWithMetadata creates test files with extended frontmatter.
+func setupTestDirWithMetadata(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+
+	files := map[string]string{
+		"api.md":      "---\ntitle: API Reference\nauthor: Jane\nstatus: published\ntags: api, rest\ncategory: engineering\n---\n# API Reference\nREST API documentation.\n\n## Endpoints\nGET /users",
+		"guide.md":    "---\ntitle: User Guide\nauthor: Bob\nstatus: draft\ntags: guide, onboarding\ncategory: docs\n---\n# User Guide\nGetting started with the platform.",
+		"internal.md": "# Internal Notes\nNo frontmatter here.",
+	}
+
+	for name, content := range files {
+		path := filepath.Join(dir, name)
+		os.MkdirAll(filepath.Dir(path), 0o755)
+		os.WriteFile(path, []byte(content), 0o644)
+	}
+
+	return dir
+}
+
+func TestSearchKeywordsWithTags(t *testing.T) {
+	dir := setupTestDirWithMetadata(t)
+	idx := NewIndex()
+	idx.Build(dir)
+
+	// Search with tag filter
+	results := idx.SearchKeywordsWithTags("documentation", []string{"api"}, 10)
+	for _, r := range results {
+		if r.Path != "/api" {
+			t.Errorf("expected only /api results with 'api' tag, got '%s'", r.Path)
+		}
+	}
+}
+
+func TestSearchKeywordsWithTagsNoQuery(t *testing.T) {
+	dir := setupTestDirWithMetadata(t)
+	idx := NewIndex()
+	idx.Build(dir)
+
+	// Filter by tag only, no keyword query
+	results := idx.SearchKeywordsWithTags("", []string{"guide"}, 10)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result with 'guide' tag, got %d", len(results))
+	}
+	if results[0].Path != "/guide" {
+		t.Errorf("expected /guide, got '%s'", results[0].Path)
+	}
+}
+
+func TestSearchKeywordsWithTagsNoMatch(t *testing.T) {
+	dir := setupTestDirWithMetadata(t)
+	idx := NewIndex()
+	idx.Build(dir)
+
+	results := idx.SearchKeywordsWithTags("anything", []string{"nonexistent"}, 10)
+	if len(results) != 0 {
+		t.Errorf("expected 0 results for nonexistent tag, got %d", len(results))
+	}
+}
+
+func TestSearchKeywordsWithEmptyTags(t *testing.T) {
+	dir := setupTestDirWithMetadata(t)
+	idx := NewIndex()
+	idx.Build(dir)
+
+	// Empty tags should behave like SearchKeywords
+	results := idx.SearchKeywordsWithTags("guide", nil, 10)
+	if len(results) == 0 {
+		t.Fatal("expected results with empty tags (no filter)")
+	}
+}
+
+func TestAllTopicsIncludesMetadata(t *testing.T) {
+	dir := setupTestDirWithMetadata(t)
+	idx := NewIndex()
+	idx.Build(dir)
+
+	topics := idx.AllTopics()
+	foundMeta := false
+	for _, doc := range topics {
+		if doc.Title == "API Reference" {
+			foundMeta = true
+			if doc.Meta.Author != "Jane" {
+				t.Errorf("expected author 'Jane', got '%s'", doc.Meta.Author)
+			}
+			if doc.Meta.Status != "published" {
+				t.Errorf("expected status 'published', got '%s'", doc.Meta.Status)
+			}
+			if len(doc.Meta.Tags) != 2 || doc.Meta.Tags[0] != "api" {
+				t.Errorf("expected tags [api, rest], got %v", doc.Meta.Tags)
+			}
+		}
+	}
+	if !foundMeta {
+		t.Error("expected to find 'API Reference' document in topics")
+	}
+}
+
 func containsString(s, substr string) bool {
 	return len(s) > 0 && len(substr) > 0 && contains(s, substr)
 }
