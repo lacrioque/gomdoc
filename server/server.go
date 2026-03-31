@@ -170,18 +170,72 @@ func (s *Server) handleMarkdown(w http.ResponseWriter, r *http.Request) {
 		title = filepath.Base(urlPath)
 	}
 
+	// Build navigation elements
+	breadcrumbs := buildBreadcrumbs(r.URL.Path)
+
+	entries, scanErr := scanner.ScanDirectory(s.baseDir)
+	var treeHTML template.HTML
+	var prevPath, prevTitle, nextPath, nextTitle string
+	if scanErr == nil {
+		tree := scanner.BuildTree(entries)
+		treeHTML = template.HTML(scanner.RenderTreeWithActive(tree, r.URL.Path))
+
+		flat := scanner.FlatPaths(tree)
+		for i, entry := range flat {
+			if entry.Path != r.URL.Path {
+				continue
+			}
+			if i > 0 {
+				prevPath = flat[i-1].Path
+				prevTitle = flat[i-1].Name
+			}
+			if i < len(flat)-1 {
+				nextPath = flat[i+1].Path
+				nextTitle = flat[i+1].Name
+			}
+			break
+		}
+	}
+
 	data := templates.PageData{
-		Title:     title,
-		SiteTitle: s.title,
-		Author:    frontmatter.Author,
-		Content:   template.HTML(html),
-		Path:      r.URL.Path,
+		Title:       title,
+		SiteTitle:   s.title,
+		Author:      frontmatter.Author,
+		Content:     template.HTML(html),
+		Path:        r.URL.Path,
+		Breadcrumbs: breadcrumbs,
+		TreeHTML:    treeHTML,
+		PrevPath:    prevPath,
+		PrevTitle:   prevTitle,
+		NextPath:    nextPath,
+		NextTitle:   nextTitle,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := templates.RenderPage(w, data); err != nil {
 		log.Printf("Error rendering page: %v", err)
 	}
+}
+
+// buildBreadcrumbs generates HTML breadcrumb navigation from a URL path.
+func buildBreadcrumbs(urlPath string) template.HTML {
+	parts := strings.Split(strings.Trim(urlPath, "/"), "/")
+	var sb strings.Builder
+	sb.WriteString(`<nav class="breadcrumbs"><a href="/">Home</a>`)
+	for i, part := range parts {
+		sb.WriteString(`<span class="breadcrumb-separator">/</span>`)
+		if i < len(parts)-1 {
+			sb.WriteString(`<span>`)
+			sb.WriteString(template.HTMLEscapeString(part))
+			sb.WriteString(`</span>`)
+		} else {
+			sb.WriteString(`<span class="breadcrumb-current">`)
+			sb.WriteString(template.HTMLEscapeString(part))
+			sb.WriteString(`</span>`)
+		}
+	}
+	sb.WriteString(`</nav>`)
+	return template.HTML(sb.String())
 }
 
 // handleStatic serves embedded static files.
@@ -322,6 +376,10 @@ body {
     margin: 0 auto;
     padding: 20px;
     background-color: var(--color-bg);
+}
+
+body.has-sidebar {
+    max-width: 1200px;
 }
 
 /* Navigation */
@@ -721,6 +779,115 @@ body {
     text-align: center;
 }
 
+/* Breadcrumbs */
+.breadcrumbs {
+    padding: 8px 0;
+    font-size: 14px;
+    color: #666;
+}
+
+.breadcrumbs a {
+    color: #0066cc;
+    text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+    text-decoration: underline;
+}
+
+.breadcrumb-separator {
+    margin: 0 6px;
+    color: #999;
+}
+
+.breadcrumb-current {
+    color: #333;
+    font-weight: 500;
+}
+
+/* Page layout with sidebar */
+.page-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+}
+
+.sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 12px;
+    font-size: 13px;
+}
+
+.sidebar .file-tree {
+    padding-left: 0;
+}
+
+.sidebar .file-tree ul {
+    padding-left: 16px;
+}
+
+.sidebar .file-tree li {
+    padding: 2px 0;
+}
+
+.page-main {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Active page highlight in file tree */
+.file-tree a.active {
+    background-color: #e8f0fe;
+    color: #1a56db;
+    font-weight: 600;
+    border-radius: 3px;
+    padding: 1px 4px;
+    margin: -1px -4px;
+}
+
+/* Prev/Next navigation */
+.prev-next-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.prev-next-spacer {
+    flex: 1;
+}
+
+.prev-next-btn {
+    display: inline-block;
+    padding: 8px 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    color: #0066cc;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.prev-next-btn:hover {
+    background-color: #f0f0f0;
+    text-decoration: none;
+}
+
+.next-btn {
+    margin-left: auto;
+}
+
 /* Index page */
 .index-content h1 {
     margin-top: 0;
@@ -876,8 +1043,12 @@ body {
         padding: 12mm 16mm 24mm 12mm;
     }
 
-    .nav-buttons, .search-box {
+    .nav-buttons, .search-box, .sidebar, .breadcrumbs, .prev-next-nav {
         display: none !important;
+    }
+
+    .page-layout {
+        display: block;
     }
 
     .site-footer {
@@ -945,5 +1116,20 @@ body {
     .content p {
         orphans: 3;
         widows: 3;
+    }
+}
+
+/* Responsive: hide sidebar on small screens */
+@media (max-width: 768px) {
+    .page-layout {
+        display: block;
+    }
+
+    .sidebar {
+        display: none;
+    }
+
+    body.has-sidebar {
+        max-width: 900px;
     }
 }`

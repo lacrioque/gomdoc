@@ -150,20 +150,25 @@ func sortTree(node *TreeNode) {
 
 // RenderTree generates an HTML tree view from the tree structure.
 func RenderTree(node *TreeNode) string {
+	return RenderTreeWithActive(node, "")
+}
+
+// RenderTreeWithActive generates an HTML tree view with the active page highlighted.
+func RenderTreeWithActive(node *TreeNode, currentPath string) string {
 	var sb strings.Builder
-	renderTreeNode(&sb, node, 0, "")
+	renderTreeNode(&sb, node, currentPath, 0, "")
 	return sb.String()
 }
 
 // renderTreeNode recursively renders a tree node as HTML.
 // Directories use <details>/<summary> for collapsible folders.
 // Depth 1 folders default to open; deeper folders default to collapsed.
-func renderTreeNode(sb *strings.Builder, node *TreeNode, depth int, parentPath string) {
+func renderTreeNode(sb *strings.Builder, node *TreeNode, currentPath string, depth int, parentPath string) {
 	// Skip the root node itself, just render its children
 	if depth == 0 {
 		sb.WriteString("<ul class=\"file-tree\">\n")
 		for _, child := range node.Children {
-			renderTreeNode(sb, child, depth+1, "")
+			renderTreeNode(sb, child, currentPath, depth+1, "")
 		}
 		sb.WriteString("</ul>\n")
 		return
@@ -188,20 +193,50 @@ func renderTreeNode(sb *strings.Builder, node *TreeNode, depth int, parentPath s
 		if len(node.Children) > 0 {
 			sb.WriteString("<ul>\n")
 			for _, child := range node.Children {
-				renderTreeNode(sb, child, depth+1, folderPath)
+				renderTreeNode(sb, child, currentPath, depth+1, folderPath)
 			}
 			sb.WriteString("</ul>\n")
 		}
 		sb.WriteString("</details>\n")
 	}
 	if !node.IsDir {
+		classes := "file"
+		if node.Path == currentPath {
+			classes = "file active"
+		}
 		sb.WriteString("<a href=\"")
 		sb.WriteString(node.Path)
-		sb.WriteString("\" class=\"file\">")
+		sb.WriteString("\" class=\"")
+		sb.WriteString(classes)
+		sb.WriteString("\">")
 		sb.WriteString(escapeHTML(node.Name))
 		sb.WriteString("</a>")
 	}
 	sb.WriteString("</li>\n")
+}
+
+// FlatPaths returns an ordered list of URL paths from the tree (depth-first).
+func FlatPaths(node *TreeNode) []PathEntry {
+	var result []PathEntry
+	flattenNode(node, &result)
+	return result
+}
+
+// PathEntry holds a URL path and display name for a document.
+type PathEntry struct {
+	Path string
+	Name string
+}
+
+// flattenNode recursively collects file paths in tree order.
+func flattenNode(node *TreeNode, result *[]PathEntry) {
+	if !node.IsDir && node.Path != "" {
+		*result = append(*result, PathEntry{Path: node.Path, Name: node.Name})
+		return
+	}
+	for _, child := range node.Children {
+		flattenNode(child, result)
+	}
 }
 
 // escapeHTML escapes special HTML characters.

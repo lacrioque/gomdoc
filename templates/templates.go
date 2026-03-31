@@ -8,11 +8,17 @@ import (
 
 // PageData holds data for rendering a markdown page.
 type PageData struct {
-	Title     string
-	SiteTitle string
-	Author    string
-	Content   template.HTML
-	Path      string
+	Title       string
+	SiteTitle   string
+	Author      string
+	Content     template.HTML
+	Path        string
+	Breadcrumbs template.HTML
+	TreeHTML    template.HTML
+	PrevPath    string
+	PrevTitle   string
+	NextPath    string
+	NextTitle   string
 }
 
 // IndexData holds data for rendering the index page.
@@ -200,25 +206,34 @@ const pageTemplate = `<!DOCTYPE html>
     <title>{{.Title}} - {{.SiteTitle}}</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body class="has-sidebar">
     <header class="print-header">
         <h1 class="print-title">{{.Title}}</h1>
         {{if .Author}}<p class="print-author">{{.Author}}</p>{{end}}
     </header>
     <nav class="nav-buttons">
-        <button onclick="history.back()" class="nav-btn">Back</button>
         <a href="/"><button class="nav-btn">Home</button></a>
         <div class="search-box">
             <input type="text" id="search-input" placeholder="Search..." autocomplete="off">
             <div id="search-results" class="search-results"></div>
         </div>
-        <span class="current-path">{{.Path}}</span>
         <button onclick="window.print()" class="nav-btn print-btn">Print</button>
         <button id="theme-toggle" class="theme-toggle" onclick="gomdocToggleTheme()" aria-label="Toggle dark mode">🌙</button>
     </nav>
-    <main class="content">
-        {{.Content}}
-    </main>
+    {{.Breadcrumbs}}
+    <div class="page-layout">
+        <aside class="sidebar">{{.TreeHTML}}</aside>
+        <div class="page-main">
+            <main class="content">
+                {{.Content}}
+            </main>
+            <nav class="prev-next-nav">
+                {{if .PrevPath}}<a href="{{.PrevPath}}" class="prev-next-btn prev-btn">&larr; {{.PrevTitle}}</a>{{end}}
+                <span class="prev-next-spacer"></span>
+                {{if .NextPath}}<a href="{{.NextPath}}" class="prev-next-btn next-btn">{{.NextTitle}} &rarr;</a>{{end}}
+            </nav>
+        </div>
+    </div>
     <footer class="site-footer">
         Documentation created by gomdoc: <a href="https://github.com/lacrioque/gomdoc/">https://github.com/lacrioque/gomdoc/</a>
     </footer>
