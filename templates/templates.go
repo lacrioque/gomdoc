@@ -135,6 +135,51 @@ const pageTemplate = `<!DOCTYPE html>
 </body>
 </html>`
 
+const folderToggleJS = `
+(function() {
+    var STORAGE_KEY = 'gomdoc-folder-state';
+
+    function loadState() {
+        try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch(e) {
+            return null;
+        }
+    }
+
+    function saveState() {
+        var state = {};
+        document.querySelectorAll('.folder-details').forEach(function(d) {
+            var key = d.getAttribute('data-folder');
+            if (key) {
+                state[key] = d.open;
+            }
+        });
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch(e) {}
+    }
+
+    // Restore saved state on load
+    var saved = loadState();
+    if (saved) {
+        document.querySelectorAll('.folder-details').forEach(function(d) {
+            var key = d.getAttribute('data-folder');
+            if (key && saved.hasOwnProperty(key)) {
+                d.open = saved[key];
+            }
+        });
+    }
+
+    // Persist state on toggle
+    document.querySelectorAll('.folder-details').forEach(function(d) {
+        d.addEventListener('toggle', saveState);
+    });
+})();
+`
+
 const indexTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -159,5 +204,6 @@ const indexTemplate = `<!DOCTYPE html>
         Documentation created by gomdoc: <a href="https://github.com/lacrioque/gomdoc/">https://github.com/lacrioque/gomdoc/</a>
     </footer>
     <script>` + searchJS + `</script>
+    <script>` + folderToggleJS + `</script>
 </body>
 </html>`

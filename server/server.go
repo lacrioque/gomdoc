@@ -291,13 +291,31 @@ body {
     padding: 3px 0;
 }
 
+.file-tree .folder-details {
+    margin: 0;
+}
+
+.file-tree .folder-details > ul {
+    margin-top: 2px;
+}
+
 .file-tree .folder {
     font-weight: bold;
     color: #555;
+    cursor: pointer;
+    list-style: none;
+}
+
+.file-tree .folder::-webkit-details-marker {
+    display: none;
 }
 
 .file-tree .folder::before {
     content: "📁 ";
+}
+
+.file-tree details[open] > .folder::before {
+    content: "📂 ";
 }
 
 .file-tree .file::before {

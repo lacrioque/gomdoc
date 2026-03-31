@@ -151,34 +151,48 @@ func sortTree(node *TreeNode) {
 // RenderTree generates an HTML tree view from the tree structure.
 func RenderTree(node *TreeNode) string {
 	var sb strings.Builder
-	renderTreeNode(&sb, node, 0)
+	renderTreeNode(&sb, node, 0, "")
 	return sb.String()
 }
 
 // renderTreeNode recursively renders a tree node as HTML.
-func renderTreeNode(sb *strings.Builder, node *TreeNode, depth int) {
+// Directories use <details>/<summary> for collapsible folders.
+// Depth 1 folders default to open; deeper folders default to collapsed.
+func renderTreeNode(sb *strings.Builder, node *TreeNode, depth int, parentPath string) {
 	// Skip the root node itself, just render its children
 	if depth == 0 {
 		sb.WriteString("<ul class=\"file-tree\">\n")
 		for _, child := range node.Children {
-			renderTreeNode(sb, child, depth+1)
+			renderTreeNode(sb, child, depth+1, "")
 		}
 		sb.WriteString("</ul>\n")
 		return
 	}
 
+	folderPath := parentPath + "/" + node.Name
+
 	sb.WriteString("<li>")
 	if node.IsDir {
-		sb.WriteString("<span class=\"folder\">")
+		openAttr := ""
+		if depth == 1 {
+			openAttr = " open"
+		}
+		sb.WriteString("<details class=\"folder-details\" data-folder=\"")
+		sb.WriteString(escapeHTML(folderPath))
+		sb.WriteString("\"")
+		sb.WriteString(openAttr)
+		sb.WriteString(">\n")
+		sb.WriteString("<summary class=\"folder\">")
 		sb.WriteString(escapeHTML(node.Name))
-		sb.WriteString("</span>\n")
+		sb.WriteString("</summary>\n")
 		if len(node.Children) > 0 {
 			sb.WriteString("<ul>\n")
 			for _, child := range node.Children {
-				renderTreeNode(sb, child, depth+1)
+				renderTreeNode(sb, child, depth+1, folderPath)
 			}
 			sb.WriteString("</ul>\n")
 		}
+		sb.WriteString("</details>\n")
 	}
 	if !node.IsDir {
 		sb.WriteString("<a href=\"")
