@@ -3,6 +3,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -21,6 +23,8 @@ func main() {
 	dir := flag.String("dir", ".", "Base directory to serve markdown files from")
 	title := flag.String("title", "gomdoc", "Custom title for the documentation site")
 	auth := flag.String("auth", "", "Basic auth credentials in user:password format")
+	mcpToken := flag.String("mcp-token", "", "Bearer token for MCP server authentication (auto-generated if empty)")
+	mcpNoAuth := flag.Bool("mcp-no-auth", false, "Disable MCP server authentication entirely")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
@@ -54,10 +58,23 @@ func main() {
 		log.Fatalf("Path is not a directory: %s", baseDir)
 	}
 
+	// Resolve MCP token: use provided, generate, or disable
+	resolvedMCPToken := *mcpToken
+	if !*mcpNoAuth && resolvedMCPToken == "" {
+		tokenBytes := make([]byte, 32)
+		if _, err := rand.Read(tokenBytes); err != nil {
+			log.Fatalf("Failed to generate MCP token: %v", err)
+		}
+		resolvedMCPToken = hex.EncodeToString(tokenBytes)
+	}
+	if *mcpNoAuth {
+		resolvedMCPToken = ""
+	}
+
 	fmt.Println("gomdoc - Markdown Documentation Server")
 	fmt.Println("=======================================")
 
-	srv := server.New(baseDir, *port, *title, authUser, authPass, version)
+	srv := server.New(baseDir, *port, *title, authUser, authPass, resolvedMCPToken, version)
 	if err := srv.Start(); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}

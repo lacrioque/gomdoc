@@ -201,16 +201,32 @@ Start gomdoc normally — the MCP server runs on /mcp/ alongside the web UI:
 
   gomdoc -dir /path/to/docs -port 7331
 
-Add to .claude/settings.json:
+A Bearer token is generated automatically on startup and printed to the log.
+You can also provide your own token:
+
+  gomdoc -dir /path/to/docs -mcp-token "my-secret-token"
+
+To disable MCP authentication entirely:
+
+  gomdoc -dir /path/to/docs -mcp-no-auth
+
+Add to .claude/settings.json (with token from startup log):
 
 {
   "mcpServers": {
     "docs": {
       "type": "sse",
-      "url": "http://localhost:7331/mcp/"
+      "url": "http://localhost:7331/mcp/",
+      "headers": {
+        "Authorization": "Bearer <token>"
+      }
     }
   }
 }
+
+For clients that cannot set headers, append the token as a query parameter:
+
+  http://localhost:7331/mcp/?token=<token>
 
 The server indexes all .md files at startup and serves MCP over SSE.
 `, docCount)

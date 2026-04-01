@@ -25,19 +25,23 @@ type Server struct {
 	title    string
 	authUser string
 	authPass string
+	mcpToken string
 	version  string
 	renderer *renderer.Renderer
 	index    *search.Index
 }
 
 // New creates a new Server instance.
-func New(baseDir string, port int, title, authUser, authPass, version string) *Server {
+// mcpToken secures the MCP endpoint with Bearer authentication.
+// Pass an empty string to disable MCP authentication.
+func New(baseDir string, port int, title, authUser, authPass, mcpToken, version string) *Server {
 	return &Server{
 		baseDir:  baseDir,
 		port:     port,
 		title:    title,
 		authUser: authUser,
 		authPass: authPass,
+		mcpToken: mcpToken,
 		version:  version,
 		renderer: renderer.New(),
 		index:    search.NewIndex(),
@@ -61,7 +65,12 @@ func (s *Server) Start() error {
 
 	mux := http.NewServeMux()
 
-	mux.Handle("/mcp/", mcpSrv.SSEHandler())
+	// Wrap MCP handler with Bearer token auth if a token is configured
+	var mcpHandler http.Handler = mcpSrv.SSEHandler()
+	if s.mcpToken != "" {
+		mcpHandler = s.bearerAuthMiddleware(mcpHandler)
+	}
+	mux.Handle("/mcp/", mcpHandler)
 	mux.HandleFunc("/", s.handleRequest)
 	mux.HandleFunc("/api/search", s.handleSearch)
 	mux.HandleFunc("/static/", s.handleStatic)
@@ -69,6 +78,12 @@ func (s *Server) Start() error {
 	addr := fmt.Sprintf(":%d", s.port)
 	log.Printf("Starting gomdoc on http://localhost%s", addr)
 	log.Printf("MCP server available at http://localhost%s/mcp/", addr)
+	if s.mcpToken != "" {
+		log.Printf("MCP authentication: Bearer token required")
+		log.Printf("MCP token: %s", s.mcpToken)
+	} else {
+		log.Printf("MCP authentication: disabled (use -mcp-token or remove -mcp-no-auth)")
+	}
 	log.Printf("Serving files from: %s", s.baseDir)
 
 	// Wrap with basic auth middleware if credentials are configured
@@ -90,6 +105,34 @@ func (s *Server) basicAuthMiddleware(next http.Handler) http.Handler {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// bearerAuthMiddleware wraps a handler with Bearer token authentication.
+// It checks the Authorization header for a valid Bearer token. Clients that
+// cannot set headers (e.g. browser SSE) may pass the token as a query
+// parameter: ?token=<value>. This covers MCP clients like Claude Desktop,
+// Cursor, and other AI tools that support header-based or URL-based auth.
+func (s *Server) bearerAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token := ""
+
+		// Check Authorization header first (preferred)
+		if auth := r.Header.Get("Authorization"); auth != "" {
+			token = strings.TrimPrefix(auth, "Bearer ")
+		}
+
+		// Fall back to query parameter for clients that cannot set headers
+		if token == "" {
+			token = r.URL.Query().Get("token")
+		}
+
+		if token != s.mcpToken {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }
