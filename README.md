@@ -78,6 +78,18 @@ docker run -p 7331:7331 -v $(pwd):/docs markusfluer/gomdoc
 # Enable basic authentication
 ./gomdoc -auth admin:secret123
 
+# Enable OAuth2 authentication
+GOMDOC_OAUTH2_CLIENT_ID=client-id \
+GOMDOC_OAUTH2_CLIENT_SECRET=client-secret \
+GOMDOC_OAUTH2_COOKIE_SECRET="$(openssl rand -hex 32)" \
+./gomdoc \
+  -oauth2-auth-url https://provider.example/oauth/authorize \
+  -oauth2-token-url https://provider.example/oauth/token \
+  -oauth2-redirect-url http://localhost:7331/oauth2/callback \
+  -oauth2-userinfo-url https://provider.example/oauth/userinfo \
+  -oauth2-scopes "openid,email,profile" \
+  -oauth2-allowed-domains example.com
+
 # Check version
 ./gomdoc -version
 ```
@@ -92,7 +104,19 @@ Then open `http://localhost:7331` in your browser.
 | `-dir` | `.` | Base directory to serve markdown files from |
 | `-title` | `gomdoc` | Custom title for the documentation site |
 | `-auth` | *(none)* | Basic auth credentials in `user:password` format |
+| `-oauth2-client-id` | `GOMDOC_OAUTH2_CLIENT_ID` | OAuth2 client ID |
+| `-oauth2-client-secret` | `GOMDOC_OAUTH2_CLIENT_SECRET` | OAuth2 client secret |
+| `-oauth2-auth-url` | `GOMDOC_OAUTH2_AUTH_URL` | OAuth2 authorization endpoint URL |
+| `-oauth2-token-url` | `GOMDOC_OAUTH2_TOKEN_URL` | OAuth2 token endpoint URL |
+| `-oauth2-redirect-url` | `GOMDOC_OAUTH2_REDIRECT_URL` | OAuth2 callback URL, usually `http://host:port/oauth2/callback` |
+| `-oauth2-userinfo-url` | `GOMDOC_OAUTH2_USERINFO_URL` | OAuth2 userinfo endpoint that returns JSON with `email` |
+| `-oauth2-scopes` | `GOMDOC_OAUTH2_SCOPES` | OAuth2 scopes, comma-separated |
+| `-oauth2-allowed-emails` | `GOMDOC_OAUTH2_ALLOWED_EMAILS` | Allowed email addresses, comma-separated |
+| `-oauth2-allowed-domains` | `GOMDOC_OAUTH2_ALLOWED_DOMAINS` | Allowed email domains, comma-separated |
+| `-oauth2-cookie-secret` | `GOMDOC_OAUTH2_COOKIE_SECRET` | Secret used to sign OAuth2 session cookies |
 | `-version` | | Print version and exit |
+
+OAuth2 and `-auth` are mutually exclusive. OAuth2 protects the browser documentation UI and search API; the MCP endpoint keeps its separate bearer-token authentication.
 
 ## MCP Server
 

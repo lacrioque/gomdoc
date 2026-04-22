@@ -20,31 +20,39 @@ import (
 
 // Server is the markdown HTTP server.
 type Server struct {
-	baseDir  string
-	port     int
-	title    string
-	authUser string
-	authPass string
-	mcpToken string
-	version  string
-	renderer *renderer.Renderer
-	index    *search.Index
+	baseDir      string
+	port         int
+	title        string
+	authUser     string
+	authPass     string
+	oauth2Config OAuth2Config
+	oauth2Client *http.Client
+	mcpToken     string
+	version      string
+	renderer     *renderer.Renderer
+	index        *search.Index
 }
 
 // New creates a new Server instance.
 // mcpToken secures the MCP endpoint with Bearer authentication.
 // Pass an empty string to disable MCP authentication.
 func New(baseDir string, port int, title, authUser, authPass, mcpToken, version string) *Server {
+	return NewWithAuth(baseDir, port, title, authUser, authPass, OAuth2Config{}, mcpToken, version)
+}
+
+// NewWithAuth creates a new Server instance with an explicit auth config.
+func NewWithAuth(baseDir string, port int, title, authUser, authPass string, oauth2Config OAuth2Config, mcpToken, version string) *Server {
 	return &Server{
-		baseDir:  baseDir,
-		port:     port,
-		title:    title,
-		authUser: authUser,
-		authPass: authPass,
-		mcpToken: mcpToken,
-		version:  version,
-		renderer: renderer.New(),
-		index:    search.NewIndex(),
+		baseDir:      baseDir,
+		port:         port,
+		title:        title,
+		authUser:     authUser,
+		authPass:     authPass,
+		oauth2Config: oauth2Config.withDefaults(),
+		mcpToken:     mcpToken,
+		version:      version,
+		renderer:     renderer.New(),
+		index:        search.NewIndex(),
 	}
 }
 
@@ -71,6 +79,9 @@ func (s *Server) Start() error {
 		mcpHandler = s.bearerAuthMiddleware(mcpHandler)
 	}
 	mux.Handle("/mcp/", mcpHandler)
+	mux.HandleFunc("/oauth2/login", s.handleOAuth2Login)
+	mux.HandleFunc("/oauth2/callback", s.handleOAuth2Callback)
+	mux.HandleFunc("/oauth2/logout", s.handleOAuth2Logout)
 	mux.HandleFunc("/", s.handleRequest)
 	mux.HandleFunc("/api/search", s.handleSearch)
 	mux.HandleFunc("/static/", s.handleStatic)
@@ -91,6 +102,9 @@ func (s *Server) Start() error {
 	if s.authUser != "" {
 		log.Printf("Basic authentication enabled")
 		handler = s.basicAuthMiddleware(mux)
+	} else if s.oauth2Config.Enabled() {
+		log.Printf("OAuth2 authentication enabled")
+		handler = s.oauth2Middleware(mux)
 	}
 
 	return http.ListenAndServe(addr, handler)
