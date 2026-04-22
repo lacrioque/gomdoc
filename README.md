@@ -118,6 +118,59 @@ Then open `http://localhost:7331` in your browser.
 
 OAuth2 and `-auth` are mutually exclusive. OAuth2 protects the browser documentation UI and search API; the MCP endpoint keeps its separate bearer-token authentication.
 
+### OAuth2 Provider Examples
+
+For each provider, register `http://localhost:7331/oauth2/callback` as an allowed redirect URI, replacing the host and port if gomdoc runs elsewhere. Use either `-oauth2-allowed-emails` for specific users or `-oauth2-allowed-domains` for a whole email domain.
+
+#### Google
+
+```bash
+GOMDOC_OAUTH2_CLIENT_ID=google-client-id \
+GOMDOC_OAUTH2_CLIENT_SECRET=google-client-secret \
+GOMDOC_OAUTH2_COOKIE_SECRET="$(openssl rand -hex 32)" \
+gomdoc \
+  -oauth2-auth-url https://accounts.google.com/o/oauth2/v2/auth \
+  -oauth2-token-url https://oauth2.googleapis.com/token \
+  -oauth2-redirect-url http://localhost:7331/oauth2/callback \
+  -oauth2-userinfo-url https://openidconnect.googleapis.com/v1/userinfo \
+  -oauth2-scopes "openid,email,profile" \
+  -oauth2-allowed-domains example.com
+```
+
+#### GitHub
+
+```bash
+GOMDOC_OAUTH2_CLIENT_ID=github-client-id \
+GOMDOC_OAUTH2_CLIENT_SECRET=github-client-secret \
+GOMDOC_OAUTH2_COOKIE_SECRET="$(openssl rand -hex 32)" \
+gomdoc \
+  -oauth2-auth-url https://github.com/login/oauth/authorize \
+  -oauth2-token-url https://github.com/login/oauth/access_token \
+  -oauth2-redirect-url http://localhost:7331/oauth2/callback \
+  -oauth2-userinfo-url https://api.github.com/user \
+  -oauth2-scopes "user" \
+  -oauth2-allowed-emails user@example.com
+```
+
+GitHub's `/user` response must include an `email` value for gomdoc to authorize the session. If a GitHub account keeps its profile email private and `/user` returns `null`, use another provider for now or extend gomdoc to read GitHub's `/user/emails` array.
+
+#### Microsoft Entra ID
+
+Replace `<tenant>` with a tenant ID, primary domain, `organizations`, `consumers`, or `common`, depending on the app registration audience.
+
+```bash
+GOMDOC_OAUTH2_CLIENT_ID=entra-client-id \
+GOMDOC_OAUTH2_CLIENT_SECRET=entra-client-secret \
+GOMDOC_OAUTH2_COOKIE_SECRET="$(openssl rand -hex 32)" \
+gomdoc \
+  -oauth2-auth-url https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize \
+  -oauth2-token-url https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token \
+  -oauth2-redirect-url http://localhost:7331/oauth2/callback \
+  -oauth2-userinfo-url https://graph.microsoft.com/oidc/userinfo \
+  -oauth2-scopes "openid,email,profile" \
+  -oauth2-allowed-domains example.com
+```
+
 ## MCP Server
 
 The MCP server gives AI coding agents structured access to your documentation via keyword search, headline browsing, and section-level reading.
